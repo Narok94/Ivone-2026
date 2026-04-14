@@ -6,6 +6,7 @@ import { db } from './src/db/index';
 import { users, clients, stockItems, sales, payments } from './src/db/schema';
 import { eq, and } from 'drizzle-orm';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -24,19 +25,23 @@ async function startServer() {
 
   // Global logger to see every request
   app.use((req, res, next) => {
-    console.log(`[Global Request] ${req.method} ${req.url}`);
+    const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
+    console.log(logMsg.trim());
+    try {
+      fs.appendFileSync('server_requests.log', logMsg);
+    } catch (e) {}
     next();
   });
 
-  // Priority User Creation Route (Directly on app to avoid router issues)
-  app.post('/api/users', async (req, res) => {
+  // Priority User Creation Route (Using /api/register to avoid conflicts)
+  app.post('/api/register', async (req, res) => {
     try {
       const data = req.body;
-      console.log('DIRECT POST /api/users reached. Body:', { ...data, password: '***' });
+      console.log('POST /api/register reached. Body:', { ...data, password: '***' });
       const [newUser] = await db.insert(users).values(data).returning();
       res.json(newUser);
     } catch (error) {
-      console.error('Error creating user (direct):', error);
+      console.error('Error creating user (register):', error);
       const message = error instanceof Error ? error.message : 'Erro desconhecido';
       res.status(400).json({ 
         error: `Erro ao criar usuário: ${message}`,

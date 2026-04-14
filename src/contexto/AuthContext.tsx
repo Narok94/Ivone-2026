@@ -80,7 +80,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [setCurrentUser]);
 
   const addUser = useCallback(async (username: string, pass: string, firstName: string, lastName: string) => {
-      const res = await fetch('/api/users', {
+      const res = await fetch('/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password: pass, firstName, lastName, role: 'user' }),
