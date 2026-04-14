@@ -22,6 +22,29 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Global logger to see every request
+  app.use((req, res, next) => {
+    console.log(`[Global Request] ${req.method} ${req.url}`);
+    next();
+  });
+
+  // Priority User Creation Route (Directly on app to avoid router issues)
+  app.post('/api/users', async (req, res) => {
+    try {
+      const data = req.body;
+      console.log('DIRECT POST /api/users reached. Body:', { ...data, password: '***' });
+      const [newUser] = await db.insert(users).values(data).returning();
+      res.json(newUser);
+    } catch (error) {
+      console.error('Error creating user (direct):', error);
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      res.status(400).json({ 
+        error: `Erro ao criar usuário: ${message}`,
+        details: error
+      });
+    }
+  });
+
   // Health check / DB Status
   app.get('/api/health', async (req, res) => {
     try {
@@ -38,14 +61,14 @@ async function startServer() {
 
   // Middleware to check DB connection for all /api routes
   apiRouter.use((req, res, next) => {
-    console.log(`[API Request] ${req.method} ${req.originalUrl}`);
+    console.log(`[API Request] ${req.method} ${req.originalUrl} - Path: ${req.path}`);
     if (!process.env.DATABASE_URL) {
       return res.status(503).json({ error: 'Banco de dados não configurado. Por favor, adicione DATABASE_URL nos Secrets.' });
     }
     next();
   });
 
-  // Users
+  // Users - POST moved to direct app route for priority
   apiRouter.get('/users', async (req, res) => {
     try {
       const result = await db.select().from(users);
@@ -53,22 +76,6 @@ async function startServer() {
     } catch (error) {
       console.error('Error fetching users:', error);
       res.status(500).json({ error: 'Erro ao buscar usuários' });
-    }
-  });
-
-  apiRouter.post('/users', async (req, res) => {
-    try {
-      const data = req.body;
-      console.log('Creating user with data:', { ...data, password: '***' });
-      const [newUser] = await db.insert(users).values(data).returning();
-      res.json(newUser);
-    } catch (error) {
-      console.error('Error creating user:', error);
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      res.status(400).json({ 
-        error: `Erro ao criar usuário: ${message}`,
-        details: error
-      });
     }
   });
 
@@ -321,10 +328,15 @@ async function startServer() {
     }
   });
 
+  // OPTIONS handler for preflights
+  apiRouter.options('*', (req, res) => {
+    res.sendStatus(200);
+  });
+
   // Catch-all for unmatched API routes
-  apiRouter.all('*', (req, res) => {
-    console.warn(`[API 404/405] Unmatched request: ${req.method} ${req.originalUrl}`);
-    res.status(405).json({ error: `Método ${req.method} não permitido para esta rota ou rota não encontrada.` });
+  apiRouter.use((req, res) => {
+    console.warn(`[API 404] Route not found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `Rota não encontrada: ${req.method} ${req.originalUrl}` });
   });
 
   // Mount the router
