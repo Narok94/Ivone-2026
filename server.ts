@@ -32,173 +32,283 @@ async function startServer() {
 
   // API Routes
   
+  // Middleware to check DB connection
+  app.use('/api', (req, res, next) => {
+    if (!process.env.DATABASE_URL) {
+      return res.status(503).json({ error: 'Banco de dados não configurado. Por favor, adicione DATABASE_URL nos Secrets.' });
+    }
+    next();
+  });
+  
   // Auth (Simplified for now, in a real app use proper auth)
   app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
     try {
+      const { username, password } = req.body;
       const user = await db.query.users.findFirst({
         where: and(eq(users.username, username), eq(users.password, password))
       });
       if (user) {
         res.json(user);
       } else {
-        res.status(401).json({ error: 'Invalid credentials' });
+        res.status(401).json({ error: 'Usuário ou senha inválidos' });
       }
     } catch (error) {
-      res.status(500).json({ error: 'Database error' });
+      console.error('Login error:', error);
+      res.status(500).json({ error: 'Erro no servidor durante o login' });
     }
   });
 
   // Clients
   app.get('/api/clients', async (req, res) => {
-    const userId = req.query.userId as string;
-    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-    const result = await db.select().from(clients).where(eq(clients.userId, userId));
-    res.json(result);
+    try {
+      const userId = req.query.userId as string;
+      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
+      const result = await db.select().from(clients).where(eq(clients.userId, userId));
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+      res.status(500).json({ error: 'Erro ao buscar clientes' });
+    }
   });
 
   app.post('/api/clients', async (req, res) => {
-    const { userId, ...data } = req.body;
-    const [newClient] = await db.insert(clients).values({ userId, ...data }).returning();
-    res.json(newClient);
+    try {
+      const { userId, ...data } = req.body;
+      const [newClient] = await db.insert(clients).values({ userId, ...data }).returning();
+      res.json(newClient);
+    } catch (error) {
+      console.error('Error creating client:', error);
+      res.status(500).json({ error: 'Erro ao criar cliente' });
+    }
   });
 
   app.put('/api/clients/:id', async (req, res) => {
-    const { id } = req.params;
-    const data = req.body;
-    const [updated] = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
-    res.json(updated);
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const [updated] = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating client:', error);
+      res.status(500).json({ error: 'Erro ao atualizar cliente' });
+    }
   });
 
   app.delete('/api/clients/:id', async (req, res) => {
-    const { id } = req.params;
-    await db.delete(clients).where(eq(clients.id, id));
-    res.json({ success: true });
+    try {
+      const { id } = req.params;
+      await db.delete(clients).where(eq(clients.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      res.status(500).json({ error: 'Erro ao excluir cliente' });
+    }
   });
 
   // Stock
   app.get('/api/stock', async (req, res) => {
-    const userId = req.query.userId as string;
-    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-    const result = await db.select().from(stockItems).where(eq(stockItems.userId, userId));
-    res.json(result);
+    try {
+      const userId = req.query.userId as string;
+      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
+      const result = await db.select().from(stockItems).where(eq(stockItems.userId, userId));
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching stock:', error);
+      res.status(500).json({ error: 'Erro ao buscar estoque' });
+    }
   });
 
   app.post('/api/stock', async (req, res) => {
-    const { userId, ...data } = req.body;
-    const [newItem] = await db.insert(stockItems).values({ userId, ...data }).returning();
-    res.json(newItem);
+    try {
+      const { userId, ...data } = req.body;
+      const [newItem] = await db.insert(stockItems).values({ userId, ...data }).returning();
+      res.json(newItem);
+    } catch (error) {
+      console.error('Error creating stock item:', error);
+      res.status(500).json({ error: 'Erro ao criar item no estoque' });
+    }
   });
 
   app.put('/api/stock/:id', async (req, res) => {
-    const { id } = req.params;
-    const data = req.body;
-    const [updated] = await db.update(stockItems).set(data).where(eq(stockItems.id, id)).returning();
-    res.json(updated);
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const [updated] = await db.update(stockItems).set(data).where(eq(stockItems.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating stock item:', error);
+      res.status(500).json({ error: 'Erro ao atualizar item no estoque' });
+    }
   });
 
   app.delete('/api/stock/:id', async (req, res) => {
-    const { id } = req.params;
-    await db.delete(stockItems).where(eq(stockItems.id, id));
-    res.json({ success: true });
+    try {
+      const { id } = req.params;
+      await db.delete(stockItems).where(eq(stockItems.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting stock item:', error);
+      res.status(500).json({ error: 'Erro ao excluir item do estoque' });
+    }
   });
 
   // Sales
   app.get('/api/sales', async (req, res) => {
-    const userId = req.query.userId as string;
-    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-    const result = await db.select().from(sales).where(eq(sales.userId, userId));
-    res.json(result);
+    try {
+      const userId = req.query.userId as string;
+      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
+      const result = await db.select().from(sales).where(eq(sales.userId, userId));
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching sales:', error);
+      res.status(500).json({ error: 'Erro ao buscar vendas' });
+    }
   });
 
   app.post('/api/sales', async (req, res) => {
-    const { userId, ...data } = req.body;
-    const [newSale] = await db.insert(sales).values({ userId, ...data }).returning();
-    res.json(newSale);
+    try {
+      const { userId, ...data } = req.body;
+      const [newSale] = await db.insert(sales).values({ userId, ...data }).returning();
+      res.json(newSale);
+    } catch (error) {
+      console.error('Error creating sale:', error);
+      res.status(500).json({ error: 'Erro ao registrar venda' });
+    }
   });
 
   app.put('/api/sales/:id', async (req, res) => {
-    const { id } = req.params;
-    const data = req.body;
-    const [updated] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
-    res.json(updated);
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const [updated] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      res.status(500).json({ error: 'Erro ao atualizar venda' });
+    }
   });
 
   app.delete('/api/sales/:id', async (req, res) => {
-    const { id } = req.params;
-    await db.delete(sales).where(eq(sales.id, id));
-    res.json({ success: true });
+    try {
+      const { id } = req.params;
+      await db.delete(sales).where(eq(sales.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting sale:', error);
+      res.status(500).json({ error: 'Erro ao excluir venda' });
+    }
   });
 
   // Payments
   app.get('/api/payments', async (req, res) => {
-    const userId = req.query.userId as string;
-    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-    const result = await db.select().from(payments).where(eq(payments.userId, userId));
-    res.json(result);
+    try {
+      const userId = req.query.userId as string;
+      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
+      const result = await db.select().from(payments).where(eq(payments.userId, userId));
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      res.status(500).json({ error: 'Erro ao buscar pagamentos' });
+    }
   });
 
   app.post('/api/payments', async (req, res) => {
-    const { userId, ...data } = req.body;
-    const [newPayment] = await db.insert(payments).values({ userId, ...data }).returning();
-    res.json(newPayment);
+    try {
+      const { userId, ...data } = req.body;
+      const [newPayment] = await db.insert(payments).values({ userId, ...data }).returning();
+      res.json(newPayment);
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      res.status(500).json({ error: 'Erro ao registrar pagamento' });
+    }
   });
 
   app.put('/api/payments/:id', async (req, res) => {
-    const { id } = req.params;
-    const data = req.body;
-    const [updated] = await db.update(payments).set(data).where(eq(payments.id, id)).returning();
-    res.json(updated);
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const [updated] = await db.update(payments).set(data).where(eq(payments.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      res.status(500).json({ error: 'Erro ao atualizar pagamento' });
+    }
   });
 
   app.delete('/api/payments/:id', async (req, res) => {
-    const { id } = req.params;
-    await db.delete(payments).where(eq(payments.id, id));
-    res.json({ success: true });
+    try {
+      const { id } = req.params;
+      await db.delete(payments).where(eq(payments.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting payment:', error);
+      res.status(500).json({ error: 'Erro ao excluir pagamento' });
+    }
   });
 
   // Users
   app.get('/api/users', async (req, res) => {
-    const result = await db.select().from(users);
-    res.json(result);
+    try {
+      const result = await db.select().from(users);
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      res.status(500).json({ error: 'Erro ao buscar usuários' });
+    }
   });
 
   app.post('/api/users', async (req, res) => {
-    const data = req.body;
     try {
+      const data = req.body;
       const [newUser] = await db.insert(users).values(data).returning();
       res.json(newUser);
     } catch (error) {
-      res.status(400).json({ error: 'Username already exists' });
+      console.error('Error creating user:', error);
+      res.status(400).json({ error: 'Este nome de usuário já existe ou ocorreu um erro no banco de dados' });
     }
   });
 
   app.put('/api/users/:id', async (req, res) => {
-    const { id } = req.params;
-    const data = req.body;
-    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-    res.json(updated);
+    try {
+      const { id } = req.params;
+      const data = req.body;
+      const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      res.status(500).json({ error: 'Erro ao atualizar usuário' });
+    }
   });
 
   app.put('/api/users/:id/password', async (req, res) => {
-    const { id } = req.params;
-    const { newPassword, oldPassword } = req.body;
-    
-    const user = await db.query.users.findFirst({ where: eq(users.id, id) });
-    if (!user) return res.status(404).json({ error: 'User not found' });
-    
-    if (oldPassword && user.password !== oldPassword) {
-      return res.status(401).json({ error: 'Incorrect old password' });
+    try {
+      const { id } = req.params;
+      const { newPassword, oldPassword } = req.body;
+      
+      const user = await db.query.users.findFirst({ where: eq(users.id, id) });
+      if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
+      
+      if (oldPassword && user.password !== oldPassword) {
+        return res.status(401).json({ error: 'Senha antiga incorreta' });
+      }
+      
+      await db.update(users).set({ password: newPassword }).where(eq(users.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error updating password:', error);
+      res.status(500).json({ error: 'Erro ao atualizar senha' });
     }
-    
-    await db.update(users).set({ password: newPassword }).where(eq(users.id, id));
-    res.json({ success: true });
   });
 
   app.delete('/api/users/:id', async (req, res) => {
-    const { id } = req.params;
-    await db.delete(users).where(eq(users.id, id));
-    res.json({ success: true });
+    try {
+      const { id } = req.params;
+      await db.delete(users).where(eq(users.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      res.status(500).json({ error: 'Erro ao excluir usuário' });
+    }
   });
 
   // Vite middleware for development

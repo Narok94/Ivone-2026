@@ -65,7 +65,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const user = await res.json();
         setCurrentUser(user);
     } else {
-        throw new Error('Usuário ou senha inválidos.');
+        let errorMessage = 'Usuário ou senha inválidos.';
+        try {
+            const contentType = res.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const err = await res.json();
+                errorMessage = err.error || errorMessage;
+            }
+        } catch (e) {
+            console.error('Error parsing login error:', e);
+        }
+        throw new Error(errorMessage);
     }
   }, [setCurrentUser]);
 
@@ -76,18 +86,43 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           body: JSON.stringify({ username, password: pass, firstName, lastName, role: 'user' }),
       });
       if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Erro ao criar usuário.');
+          let errorMessage = 'Erro ao criar usuário.';
+          try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                  const err = await res.json();
+                  errorMessage = err.error || errorMessage;
+              } else {
+                  const text = await res.text();
+                  errorMessage = text || errorMessage;
+              }
+          } catch (e) {
+              console.error('Error parsing error response:', e);
+          }
+          throw new Error(errorMessage);
       }
       fetchUsers();
   }, [fetchUsers]);
 
   const updateUser = useCallback(async (updatedUserData: Partial<Omit<User, 'password' | 'role' | 'id'>> & { id: string }) => {
-      await fetch(`/api/users/${updatedUserData.id}`, {
+      const res = await fetch(`/api/users/${updatedUserData.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updatedUserData),
       });
+      if (!res.ok) {
+          let errorMessage = 'Erro ao atualizar usuário.';
+          try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                  const err = await res.json();
+                  errorMessage = err.error || errorMessage;
+              }
+          } catch (e) {
+              console.error('Error parsing update user error:', e);
+          }
+          throw new Error(errorMessage);
+      }
       fetchUsers();
       if (currentUser?.id === updatedUserData.id) {
           setCurrentUser(prev => prev ? { ...prev, ...updatedUserData } : null);
@@ -101,16 +136,34 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           body: JSON.stringify({ newPassword: newPass, oldPassword: oldPass }),
       });
       if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Erro ao atualizar senha.');
+          let errorMessage = 'Erro ao atualizar senha.';
+          try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                  const err = await res.json();
+                  errorMessage = err.error || errorMessage;
+              }
+          } catch (e) {
+              console.error('Error parsing update password error:', e);
+          }
+          throw new Error(errorMessage);
       }
   }, []);
 
   const deleteUser = useCallback(async (userId: string) => {
       const res = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
       if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || 'Erro ao excluir usuário.');
+          let errorMessage = 'Erro ao excluir usuário.';
+          try {
+              const contentType = res.headers.get('content-type');
+              if (contentType && contentType.includes('application/json')) {
+                  const err = await res.json();
+                  errorMessage = err.error || errorMessage;
+              }
+          } catch (e) {
+              console.error('Error parsing delete user error:', e);
+          }
+          throw new Error(errorMessage);
       }
       fetchUsers();
   }, [fetchUsers]);
