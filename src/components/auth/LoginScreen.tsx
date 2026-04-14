@@ -4,39 +4,53 @@ import { Card, Button, Input } from '../common';
 import { DogIcon, CatIcon } from '../ui/Icons';
 
 export const LoginScreen: FC = () => {
+    const [isRegistering, setIsRegistering] = useState(false);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [firstName, setFirstName] = useState('');
+    const [lastName, setLastName] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [error, setError] = useState('');
-    const { login } = useAuth();
+    const [success, setSuccess] = useState('');
+    const { login, addUser } = useAuth();
 
     useEffect(() => {
         const rememberedUser = localStorage.getItem('rememberedUsername');
-        if (rememberedUser) {
+        if (rememberedUser && !isRegistering) {
             setUsername(rememberedUser);
             setRememberMe(true);
         }
-    }, []);
+    }, [isRegistering]);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setSuccess('');
         
-        // Security: Trim inputs
         const cleanUsername = username.trim();
-        const cleanPassword = password; // Don't trim password as spaces might be intentional
+        const cleanPassword = password;
 
-        if (!cleanUsername || !cleanPassword) {
-            setError('Por favor, preencha todos os campos.');
+        if (!cleanUsername || !cleanPassword || (isRegistering && (!firstName || !lastName))) {
+            setError('Por favor, preencha todos os campos obrigatórios.');
             return;
         }
 
         try {
-            login(cleanUsername, cleanPassword);
-            if (rememberMe) {
-                localStorage.setItem('rememberedUsername', cleanUsername);
+            if (isRegistering) {
+                await addUser(cleanUsername, cleanPassword, firstName, lastName);
+                setSuccess('Conta criada com sucesso! Agora você pode entrar.');
+                setIsRegistering(false);
+                // Clear fields but keep username for easy login
+                setPassword('');
+                setFirstName('');
+                setLastName('');
             } else {
-                localStorage.removeItem('rememberedUsername');
+                await login(cleanUsername, cleanPassword);
+                if (rememberMe) {
+                    localStorage.setItem('rememberedUsername', cleanUsername);
+                } else {
+                    localStorage.removeItem('rememberedUsername');
+                }
             }
         } catch (err: any) {
             setError(err.message);
@@ -56,10 +70,32 @@ export const LoginScreen: FC = () => {
             <main className="z-10 w-full max-w-md mx-auto p-6">
                 <Card className="!p-8">
                      <h1 className="text-3xl font-extrabold text-center tracking-tight bg-gradient-to-r from-pink-500 to-rose-500 text-transparent bg-clip-text mb-2">
-                        Sistema de Vendas
+                        {isRegistering ? 'Criar Conta' : 'Sistema de Vendas'}
                     </h1>
-                    <p className="text-center text-gray-500 mb-8">Acesse sua conta para continuar.</p>
+                    <p className="text-center text-gray-500 mb-8">
+                        {isRegistering ? 'Preencha os dados para se cadastrar.' : 'Acesse sua conta para continuar.'}
+                    </p>
+                    
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        {isRegistering && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input 
+                                    label="Nome" 
+                                    id="firstName" 
+                                    value={firstName} 
+                                    onChange={e => setFirstName(e.target.value)}
+                                    required 
+                                />
+                                <Input 
+                                    label="Sobrenome" 
+                                    id="lastName" 
+                                    value={lastName} 
+                                    onChange={e => setLastName(e.target.value)}
+                                    required 
+                                />
+                            </div>
+                        )}
+                        
                         <Input 
                             label="Usuário" 
                             id="username" 
@@ -74,26 +110,48 @@ export const LoginScreen: FC = () => {
                             type="password"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            autoComplete="current-password"
+                            autoComplete={isRegistering ? "new-password" : "current-password"}
                             required 
                         />
-                         <div className="flex items-center justify-between">
-                            <div className="flex items-center">
-                                <input
-                                    id="remember-me"
-                                    name="remember-me"
-                                    type="checkbox"
-                                    checked={rememberMe}
-                                    onChange={(e) => setRememberMe(e.target.checked)}
-                                    className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
-                                />
-                                <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
-                                    Lembrar usuário
-                                </label>
+
+                         {!isRegistering && (
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center">
+                                    <input
+                                        id="remember-me"
+                                        name="remember-me"
+                                        type="checkbox"
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                                    />
+                                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-900">
+                                        Lembrar usuário
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                         )}
+
                         {error && <p className="text-red-500 text-sm text-center pt-2">{error}</p>}
-                        <Button type="submit" className="w-full !py-3 !text-base !mt-6">Entrar</Button>
+                        {success && <p className="text-emerald-500 text-sm text-center pt-2 font-medium">{success}</p>}
+                        
+                        <Button type="submit" className="w-full !py-3 !text-base !mt-6">
+                            {isRegistering ? 'Cadastrar' : 'Entrar'}
+                        </Button>
+
+                        <div className="text-center mt-6">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsRegistering(!isRegistering);
+                                    setError('');
+                                    setSuccess('');
+                                }}
+                                className="text-sm font-bold text-pink-600 hover:text-pink-700 transition-colors"
+                            >
+                                {isRegistering ? 'Já tem uma conta? Entre aqui' : 'Não tem uma conta? Cadastre-se'}
+                            </button>
+                        </div>
                     </form>
                 </Card>
             </main>

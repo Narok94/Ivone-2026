@@ -18,6 +18,16 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health check / DB Status
+  app.get('/api/health', async (req, res) => {
+    try {
+      await db.select().from(users).limit(1);
+      res.json({ status: 'connected', database: 'Neon' });
+    } catch (error) {
+      res.status(500).json({ status: 'error', message: error instanceof Error ? error.message : 'Unknown error' });
+    }
+  });
+
   // API Routes
   
   // Auth (Simplified for now, in a real app use proper auth)
