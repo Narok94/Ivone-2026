@@ -33,23 +33,6 @@ async function startServer() {
     next();
   });
 
-  // Priority User Creation Route (Using /api/register to avoid conflicts)
-  app.post('/api/register', async (req, res) => {
-    try {
-      const data = req.body;
-      console.log('POST /api/register reached. Body:', { ...data, password: '***' });
-      const [newUser] = await db.insert(users).values(data).returning();
-      res.json(newUser);
-    } catch (error) {
-      console.error('Error creating user (register):', error);
-      const message = error instanceof Error ? error.message : 'Erro desconhecido';
-      res.status(400).json({ 
-        error: `Erro ao criar usuário: ${message}`,
-        details: error
-      });
-    }
-  });
-
   // Health check / DB Status
   app.get('/api/health', async (req, res) => {
     try {
@@ -367,16 +350,39 @@ async function startServer() {
     try {
       console.log('Checking for existing users...');
       const existingUsers = await db.select().from(users);
-      if (existingUsers.length === 0) {
-        console.log('Seeding default users...');
-        await db.insert(users).values([
-          { username: 'admin', password: 'admin', role: 'admin', firstName: 'Admin', lastName: 'Master' },
-          { username: 'ivone', password: 'ivone1234', role: 'user', firstName: 'Ivone', lastName: 'Silva' },
-        ]);
-        console.log('✅ Seed concluído com sucesso.');
+      
+      // Ensure ivone exists with password 9860
+      const ivoneUser = existingUsers.find(u => u.username === 'ivone');
+      if (ivoneUser) {
+        if (ivoneUser.password !== '9860') {
+          console.log('Updating Ivone password to 9860...');
+          await db.update(users).set({ password: '9860' }).where(eq(users.username, 'ivone'));
+        }
       } else {
-        console.log(`Database already has ${existingUsers.length} users.`);
+        console.log('Creating Ivone user...');
+        await db.insert(users).values({ 
+          username: 'ivone', 
+          password: '9860', 
+          role: 'user', 
+          firstName: 'Ivone', 
+          lastName: 'Silva' 
+        });
       }
+
+      // Ensure admin exists
+      const adminUser = existingUsers.find(u => u.username === 'admin');
+      if (!adminUser) {
+        console.log('Creating Admin user...');
+        await db.insert(users).values({ 
+          username: 'admin', 
+          password: 'admin', 
+          role: 'admin', 
+          firstName: 'Admin', 
+          lastName: 'Master' 
+        });
+      }
+
+      console.log('✅ Seed concluído com sucesso.');
     } catch (error) {
       console.error('❌ Erro crítico no seed:', error);
       throw error;
