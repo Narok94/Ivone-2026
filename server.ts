@@ -114,12 +114,21 @@ async function startServer() {
   apiRouter.post('/auth/login', async (req, res) => {
     try {
       const { username, password } = req.body;
+      console.log(`Login attempt for username: "${username}"`);
+      
+      // Case-insensitive username check
       const user = await db.query.users.findFirst({
-        where: and(eq(users.username, username), eq(users.password, password))
+        where: and(
+          eq(users.username, username.toLowerCase().trim()), 
+          eq(users.password, password)
+        )
       });
+
       if (user) {
+        console.log(`✅ Login successful for: ${username}`);
         res.json(user);
       } else {
+        console.warn(`❌ Login failed for: ${username} (Invalid credentials)`);
         res.status(401).json({ error: 'Usuário ou senha inválidos' });
       }
     } catch (error) {
@@ -350,13 +359,14 @@ async function startServer() {
     try {
       console.log('Checking for existing users...');
       const existingUsers = await db.select().from(users);
+      console.log('Current users in DB:', existingUsers.map(u => ({ username: u.username, role: u.role })));
       
       // Ensure ivone exists with password 9860
-      const ivoneUser = existingUsers.find(u => u.username === 'ivone');
+      const ivoneUser = existingUsers.find(u => u.username.toLowerCase() === 'ivone');
       if (ivoneUser) {
         if (ivoneUser.password !== '9860') {
           console.log('Updating Ivone password to 9860...');
-          await db.update(users).set({ password: '9860' }).where(eq(users.username, 'ivone'));
+          await db.update(users).set({ password: '9860', username: 'ivone' }).where(eq(users.id, ivoneUser.id));
         }
       } else {
         console.log('Creating Ivone user...');
