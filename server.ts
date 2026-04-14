@@ -19,7 +19,10 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  console.log('DATABASE_URL is', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+  console.log('DATABASE_URL is', process.env.DATABASE_URL ? `SET (Length: ${process.env.DATABASE_URL.length})` : 'NOT SET');
+  if (process.env.DATABASE_URL) {
+    console.log('DATABASE_URL starts with:', process.env.DATABASE_URL.substring(0, 15) + '...');
+  }
 
   app.use(express.json());
 
@@ -114,26 +117,39 @@ async function startServer() {
   apiRouter.post('/auth/login', async (req, res) => {
     try {
       const { username, password } = req.body;
-      console.log(`Login attempt for username: "${username}"`);
+      const cleanUsername = username.toLowerCase().trim();
+      console.log(`[LOGIN] Attempt for: "${cleanUsername}"`);
       
-      // Case-insensitive username check
+      // Find user by username only first to debug
       const user = await db.query.users.findFirst({
-        where: and(
-          eq(users.username, username.toLowerCase().trim()), 
-          eq(users.password, password)
-        )
+        where: eq(users.username, cleanUsername)
       });
 
-      if (user) {
-        console.log(`✅ Login successful for: ${username}`);
-        res.json(user);
-      } else {
-        console.warn(`❌ Login failed for: ${username} (Invalid credentials)`);
-        res.status(401).json({ error: 'Usuário ou senha inválidos' });
+      if (!user) {
+        console.warn(`[LOGIN] ❌ User not found: "${cleanUsername}"`);
+        return res.status(401).json({ error: 'Usuário não encontrado' });
       }
+
+      if (user.password !== password) {
+        console.warn(`[LOGIN] ❌ Password mismatch for: "${cleanUsername}". Expected: "${user.password}", Got: "${password}"`);
+        return res.status(401).json({ error: 'Senha inválida' });
+      }
+
+      console.log(`[LOGIN] ✅ Success for: ${cleanUsername}`);
+      res.json(user);
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('[LOGIN] 💥 Server error:', error);
       res.status(500).json({ error: 'Erro no servidor durante o login' });
+    }
+  });
+
+  // DEBUG ROUTE - Remove in production
+  apiRouter.get('/debug/users', async (req, res) => {
+    try {
+      const allUsers = await db.select().from(users);
+      res.json(allUsers.map(u => ({ id: u.id, username: u.username, password: u.password, role: u.role })));
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Error' });
     }
   });
 
@@ -364,9 +380,12 @@ async function startServer() {
       // Ensure ivone exists with password 9860
       const ivoneUser = existingUsers.find(u => u.username.toLowerCase() === 'ivone');
       if (ivoneUser) {
+        console.log('Ivone user found, checking password...');
         if (ivoneUser.password !== '9860') {
           console.log('Updating Ivone password to 9860...');
           await db.update(users).set({ password: '9860', username: 'ivone' }).where(eq(users.id, ivoneUser.id));
+        } else {
+          console.log('Ivone password is already 9860.');
         }
       } else {
         console.log('Creating Ivone user...');
