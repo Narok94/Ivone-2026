@@ -19,24 +19,13 @@ async function seed() {
       await db.insert(users).values({ 
         username: 'ivone', 
         password: '9860', 
-        role: 'user', 
-        firstName: 'Ivone', 
-        lastName: 'Silva' 
-      });
-    }
-
-    const adminUser = existingUsers.find(u => u.username === 'admin');
-    if (!adminUser) {
-      await db.insert(users).values({ 
-        username: 'admin', 
-        password: 'admin', 
         role: 'admin', 
-        firstName: 'Admin', 
-        lastName: 'Master' 
+        firstName: 'Ivone', 
+        lastName: '' 
       });
     }
 
-    console.log('[v0] Seed completed.');
+    console.log('[v0] Seed completed - Usuário ivone configurado.');
   } catch (error) {
     console.error('[v0] Seed error:', error);
   }
