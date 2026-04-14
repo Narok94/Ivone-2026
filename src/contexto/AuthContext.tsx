@@ -86,7 +86,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           body: JSON.stringify({ username, password: pass, firstName, lastName, role: 'user' }),
       });
       if (!res.ok) {
-          let errorMessage = 'Erro ao criar usuário.';
+          let errorMessage = `Erro ${res.status}: ao criar usuário.`;
           try {
               const contentType = res.headers.get('content-type');
               if (contentType && contentType.includes('application/json')) {

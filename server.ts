@@ -18,6 +18,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  console.log('DATABASE_URL is', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
+
   app.use(express.json());
 
   // Health check / DB Status
@@ -260,11 +262,16 @@ async function startServer() {
   app.post('/api/users', async (req, res) => {
     try {
       const data = req.body;
+      console.log('Creating user with data:', { ...data, password: '***' });
       const [newUser] = await db.insert(users).values(data).returning();
       res.json(newUser);
     } catch (error) {
       console.error('Error creating user:', error);
-      res.status(400).json({ error: 'Este nome de usuário já existe ou ocorreu um erro no banco de dados' });
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      res.status(400).json({ 
+        error: `Erro ao criar usuário: ${message}`,
+        details: error
+      });
     }
   });
 
@@ -328,19 +335,28 @@ async function startServer() {
 
   // Seed default users if they don't exist
   async function seed() {
-    const existingUsers = await db.select().from(users);
-    if (existingUsers.length === 0) {
-      console.log('Seeding default users...');
-      await db.insert(users).values([
-        { username: 'admin', password: 'admin', role: 'admin', firstName: 'Admin', lastName: 'Master' },
-        { username: 'ivone', password: 'ivone1234', role: 'user', firstName: 'Ivone', lastName: 'Silva' },
-      ]);
+    try {
+      console.log('Checking for existing users...');
+      const existingUsers = await db.select().from(users);
+      if (existingUsers.length === 0) {
+        console.log('Seeding default users...');
+        await db.insert(users).values([
+          { username: 'admin', password: 'admin', role: 'admin', firstName: 'Admin', lastName: 'Master' },
+          { username: 'ivone', password: 'ivone1234', role: 'user', firstName: 'Ivone', lastName: 'Silva' },
+        ]);
+        console.log('✅ Seed concluído com sucesso.');
+      } else {
+        console.log(`Database already has ${existingUsers.length} users.`);
+      }
+    } catch (error) {
+      console.error('❌ Erro crítico no seed:', error);
+      throw error;
     }
   }
   try {
     await seed();
   } catch (error) {
-    console.warn('⚠️ Erro ao executar seed (provavelmente DATABASE_URL não configurada):', error instanceof Error ? error.message : error);
+    console.warn('⚠️ Falha ao inicializar banco de dados:', error instanceof Error ? error.message : error);
   }
 
   app.listen(PORT, '0.0.0.0', () => {
