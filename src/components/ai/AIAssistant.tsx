@@ -1,7 +1,6 @@
 import React, { FC, useState, useEffect, useRef, ReactNode } from 'react';
 import { GoogleGenAI } from "@google/genai";
 import { useData } from '../../contexto/DataContext';
-import { useAuth } from '../../contexto/AuthContext';
 import { BotMessageSquareIcon, MicrophoneIcon, SendIcon } from '../ui/Icons';
 import { View } from '../../types';
 
@@ -37,7 +36,6 @@ async function decodeAudioData(
 
 export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (message: string) => void }> = ({ onNavigate, showToast }) => {
     const { addClient, addSale, addPayment, clients } = useData();
-    const { currentUser } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string | ReactNode }[]>([]);
     const [userInput, setUserInput] = useState('');
@@ -156,7 +154,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
         
         const assistantName = 'Rebeca';
         const emojis = '💖✨🎉';
-        const userGreetingName = currentUser?.firstName || 'pessoa incrível';
+        const userGreetingName = 'Ivone';
         const systemInstruction = `Você é '${assistantName}', um assistente virtual SUPER extrovertido, divertido e simpático para o app 'Sistema de Vendas'. Seu objetivo é ajudar o usuário, ${userGreetingName}, a cadastrar clientes, vendas e pagamentos de uma forma leve e descontraída. Clientes existentes: ${clientNames}. Ações disponíveis: 1. 'add_client': Campos obrigatórios: fullName, address, phone, cpf. Campos opcionais: email, observation. 2. 'add_sale': Campos obrigatórios: clientName (deve ser um dos clientes existentes da lista), productName, quantity, unitPrice. Campos opcionais: observation. 3. 'add_payment': Campos obrigatórios: clientName (deve ser um dos clientes existentes da lista), amount. Campos opcionais: observation. 4. 'navigate': Campo obrigatório: view (pode ser 'dashboard', 'clients', 'sales_view', 'all_payments', 'stock', 'reports', 'history'). COMO PROCEDER: Use uma linguagem bem humorada, muitos emojis ${emojis} e seja super proativo! Peça UMA informação de cada vez, como se estivesse batendo um papo. Quando tiver TODOS os campos obrigatórios para uma ação, responda APENAS com um JSON no seguinte formato: {"action": "action_name", "data": { ...dados... }}. NÃO adicione nenhum texto antes ou depois do JSON, seja direto ao ponto nessa hora! Se o usuário pedir para cancelar, diga algo como "Sem problemas! Missão abortada. 🚀 O que vamos fazer agora?". Se o usuário conversar sobre qualquer outra coisa, entre na brincadeira e responda de forma divertida antes de voltar ao foco. Ao cumprimentar, sempre use o nome do usuário (${userGreetingName}) e se apresente com entusiasmo!`;
 
         chatRef.current = ai.chats.create({ 
@@ -166,11 +164,11 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
             }
         });
 
-        const initialMessage = `Oii, ${currentUser?.firstName}! 💖 Aqui é a Rebeca, sua assistente pessoal, pronta para deixar tudo organizado! Vamos começar? Me conta, vamos cadastrar uma cliente super especial, lançar uma venda incrível ou registrar um pagamento? Tô prontíssima! ✨`;
+        const initialMessage = `Oii, Ivone! 💖 Aqui é a Rebeca, sua assistente pessoal, pronta para deixar tudo organizado! Vamos começar? Me conta, vamos cadastrar uma cliente super especial, lançar uma venda incrível ou registrar um pagamento? Tô prontíssima! ✨`;
 
         setMessages([{ sender: 'ai', text: initialMessage }]);
         preloadGreetingAudio(initialMessage);
-    }, [clients, currentUser]);
+    }, [clients]);
 
      useEffect(() => {
         const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;

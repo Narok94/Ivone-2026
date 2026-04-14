@@ -1,361 +1,329 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
+import { neon } from '@neondatabase/serverless';
+import * as dotenv from 'dotenv';
+import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from './src/db/index';
-import { users, clients, stockItems, sales, payments } from './src/db/schema';
-import { eq, and } from 'drizzle-orm';
-import dotenv from 'dotenv';
-import fs from 'fs';
 
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  console.log('DATABASE_URL is', process.env.DATABASE_URL ? `SET (Length: ${process.env.DATABASE_URL.length})` : 'NOT SET');
-  if (process.env.DATABASE_URL) {
-    console.log('DATABASE_URL starts with:', process.env.DATABASE_URL.substring(0, 15) + '...');
-  }
-
+  app.use(cors());
   app.use(express.json());
 
-  // Global logger to see every request
-  app.use((req, res, next) => {
-    const logMsg = `[${new Date().toISOString()}] ${req.method} ${req.url}\n`;
-    console.log(logMsg.trim());
-    try {
-      fs.appendFileSync('server_requests.log', logMsg);
-    } catch (e) {}
-    next();
-  });
+  const sql = neon(process.env.DATABASE_URL!);
 
-  // Health check / DB Status
+  // --- DATABASE INITIALIZATION ---
+  async function initDb() {
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS clients (
+          id TEXT PRIMARY KEY,
+          full_name TEXT NOT NULL,
+          cep TEXT,
+          street TEXT,
+          number TEXT,
+          complement TEXT,
+          neighborhood TEXT,
+          city TEXT,
+          state TEXT,
+          phone TEXT,
+          email TEXT,
+          cpf TEXT,
+          observation TEXT
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS stock_items (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          size TEXT,
+          code TEXT,
+          quantity INTEGER DEFAULT 0
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS sales (
+          id TEXT PRIMARY KEY,
+          client_id TEXT REFERENCES clients(id),
+          sale_date DATE NOT NULL,
+          product_code TEXT,
+          product_name TEXT NOT NULL,
+          stock_item_id TEXT,
+          quantity NUMERIC NOT NULL,
+          unit_price NUMERIC NOT NULL,
+          total NUMERIC NOT NULL,
+          observation TEXT
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS payments (
+          id TEXT PRIMARY KEY,
+          client_id TEXT REFERENCES clients(id),
+          payment_date DATE NOT NULL,
+          amount NUMERIC NOT NULL,
+          observation TEXT
+        )
+      `;
+      console.log('Database tables initialized');
+    } catch (err) {
+      console.error('Error initializing database:', err);
+    }
+  }
+
+  if (process.env.DATABASE_URL) {
+    await initDb();
+  }
+
+  // --- API ROUTES ---
+
+  // Health check
   app.get('/api/health', async (req, res) => {
     try {
-      await db.select().from(users).limit(1);
-      res.json({ status: 'connected', database: 'Neon' });
-    } catch (error) {
-      res.status(500).json({ status: 'error', message: error instanceof Error ? error.message : 'Unknown error' });
-    }
-  });
-
-  // API Routes
-  
-  const apiRouter = express.Router();
-
-  // Middleware to check DB connection for all /api routes
-  apiRouter.use((req, res, next) => {
-    console.log(`[API Request] ${req.method} ${req.originalUrl} - Path: ${req.path}`);
-    if (!process.env.DATABASE_URL) {
-      return res.status(503).json({ error: 'Banco de dados não configurado. Por favor, adicione DATABASE_URL nos Secrets.' });
-    }
-    next();
-  });
-
-  // Users - POST moved to direct app route for priority
-  apiRouter.get('/users', async (req, res) => {
-    try {
-      const result = await db.select().from(users);
-      res.json(result);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      res.status(500).json({ error: 'Erro ao buscar usuários' });
-    }
-  });
-
-  apiRouter.put('/users/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const data = req.body;
-      const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      res.status(500).json({ error: 'Erro ao atualizar usuário' });
-    }
-  });
-
-  apiRouter.put('/users/:id/password', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { newPassword, oldPassword } = req.body;
-      
-      const user = await db.query.users.findFirst({ where: eq(users.id, id) });
-      if (!user) return res.status(404).json({ error: 'Usuário não encontrado' });
-      
-      if (oldPassword && user.password !== oldPassword) {
-        return res.status(401).json({ error: 'Senha antiga incorreta' });
-      }
-      
-      await db.update(users).set({ password: newPassword }).where(eq(users.id, id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error updating password:', error);
-      res.status(500).json({ error: 'Erro ao atualizar senha' });
-    }
-  });
-
-  apiRouter.delete('/users/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      await db.delete(users).where(eq(users.id, id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      res.status(500).json({ error: 'Erro ao excluir usuário' });
-    }
-  });
-
-  // Auth
-  apiRouter.post('/auth/login', async (req, res) => {
-    try {
-      const { username, password } = req.body;
-      const cleanUsername = username.toLowerCase().trim();
-      console.log(`[LOGIN] Attempt for: "${cleanUsername}"`);
-      
-      // Find user by username only first to debug
-      const user = await db.query.users.findFirst({
-        where: eq(users.username, cleanUsername)
-      });
-
-      if (!user) {
-        console.warn(`[LOGIN] ❌ User not found: "${cleanUsername}"`);
-        return res.status(401).json({ error: 'Usuário não encontrado' });
-      }
-
-      if (user.password !== password) {
-        console.warn(`[LOGIN] ❌ Password mismatch for: "${cleanUsername}". Expected: "${user.password}", Got: "${password}"`);
-        return res.status(401).json({ error: 'Senha inválida' });
-      }
-
-      console.log(`[LOGIN] ✅ Success for: ${cleanUsername}`);
-      res.json(user);
-    } catch (error) {
-      console.error('[LOGIN] 💥 Server error:', error);
-      res.status(500).json({ error: 'Erro no servidor durante o login' });
-    }
-  });
-
-  // DEBUG ROUTE - Remove in production
-  apiRouter.get('/debug/users', async (req, res) => {
-    try {
-      const allUsers = await db.select().from(users);
-      res.json(allUsers.map(u => ({ id: u.id, username: u.username, password: u.password, role: u.role })));
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Error' });
+      await sql`SELECT 1`;
+      res.json({ status: 'connected' });
+    } catch (err) {
+      res.status(500).json({ status: 'error', message: (err as Error).message });
     }
   });
 
   // Clients
-  apiRouter.get('/clients', async (req, res) => {
+  app.get('/api/clients', async (req, res) => {
     try {
-      const userId = req.query.userId as string;
-      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-      const result = await db.select().from(clients).where(eq(clients.userId, userId));
+      const result = await sql`SELECT * FROM clients`;
+      // Map snake_case to camelCase
+      const clients = result.map(c => ({
+        id: c.id,
+        fullName: c.full_name,
+        cep: c.cep,
+        street: c.street,
+        number: c.number,
+        complement: c.complement,
+        neighborhood: c.neighborhood,
+        city: c.city,
+        state: c.state,
+        phone: c.phone,
+        email: c.email,
+        cpf: c.cpf,
+        observation: c.observation
+      }));
+      res.json(clients);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.post('/api/clients', async (req, res) => {
+    const c = req.body;
+    try {
+      await sql`
+        INSERT INTO clients (id, full_name, cep, street, number, complement, neighborhood, city, state, phone, email, cpf, observation)
+        VALUES (${c.id}, ${c.fullName}, ${c.cep}, ${c.street}, ${c.number}, ${c.complement}, ${c.neighborhood}, ${c.city}, ${c.state}, ${c.phone}, ${c.email}, ${c.cpf}, ${c.observation})
+      `;
+      res.status(201).json(c);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.put('/api/clients/:id', async (req, res) => {
+    const { id } = req.params;
+    const c = req.body;
+    try {
+      await sql`
+        UPDATE clients SET 
+          full_name = ${c.fullName}, cep = ${c.cep}, street = ${c.street}, number = ${c.number}, 
+          complement = ${c.complement}, neighborhood = ${c.neighborhood}, city = ${c.city}, 
+          state = ${c.state}, phone = ${c.phone}, email = ${c.email}, cpf = ${c.cpf}, 
+          observation = ${c.observation}
+        WHERE id = ${id}
+      `;
+      res.json(c);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.delete('/api/clients/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await sql`DELETE FROM clients WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Stock Items
+  app.get('/api/stock', async (req, res) => {
+    try {
+      const result = await sql`SELECT * FROM stock_items`;
       res.json(result);
-    } catch (error) {
-      console.error('Error fetching clients:', error);
-      res.status(500).json({ error: 'Erro ao buscar clientes' });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.post('/clients', async (req, res) => {
+  app.post('/api/stock', async (req, res) => {
+    const item = req.body;
     try {
-      const { userId, ...data } = req.body;
-      const [newClient] = await db.insert(clients).values({ userId, ...data }).returning();
-      res.json(newClient);
-    } catch (error) {
-      console.error('Error creating client:', error);
-      res.status(500).json({ error: 'Erro ao criar cliente' });
+      await sql`
+        INSERT INTO stock_items (id, name, size, code, quantity)
+        VALUES (${item.id}, ${item.name}, ${item.size}, ${item.code}, ${item.quantity})
+      `;
+      res.status(201).json(item);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.put('/clients/:id', async (req, res) => {
+  app.patch('/api/stock/:id', async (req, res) => {
+    const { id } = req.params;
+    const { quantity } = req.body;
     try {
-      const { id } = req.params;
-      const data = req.body;
-      const [updated] = await db.update(clients).set(data).where(eq(clients.id, id)).returning();
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating client:', error);
-      res.status(500).json({ error: 'Erro ao atualizar cliente' });
+      await sql`UPDATE stock_items SET quantity = ${quantity} WHERE id = ${id}`;
+      res.json({ id, quantity });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.delete('/clients/:id', async (req, res) => {
+  app.delete('/api/stock/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-      const { id } = req.params;
-      await db.delete(clients).where(eq(clients.id, id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting client:', error);
-      res.status(500).json({ error: 'Erro ao excluir cliente' });
-    }
-  });
-
-  // Stock
-  apiRouter.get('/stock', async (req, res) => {
-    try {
-      const userId = req.query.userId as string;
-      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-      const result = await db.select().from(stockItems).where(eq(stockItems.userId, userId));
-      res.json(result);
-    } catch (error) {
-      console.error('Error fetching stock:', error);
-      res.status(500).json({ error: 'Erro ao buscar estoque' });
-    }
-  });
-
-  apiRouter.post('/stock', async (req, res) => {
-    try {
-      const { userId, ...data } = req.body;
-      const [newItem] = await db.insert(stockItems).values({ userId, ...data }).returning();
-      res.json(newItem);
-    } catch (error) {
-      console.error('Error creating stock item:', error);
-      res.status(500).json({ error: 'Erro ao criar item no estoque' });
-    }
-  });
-
-  apiRouter.put('/stock/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const data = req.body;
-      const [updated] = await db.update(stockItems).set(data).where(eq(stockItems.id, id)).returning();
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating stock item:', error);
-      res.status(500).json({ error: 'Erro ao atualizar item no estoque' });
-    }
-  });
-
-  apiRouter.delete('/stock/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      await db.delete(stockItems).where(eq(stockItems.id, id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting stock item:', error);
-      res.status(500).json({ error: 'Erro ao excluir item do estoque' });
+      await sql`DELETE FROM stock_items WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
   // Sales
-  apiRouter.get('/sales', async (req, res) => {
+  app.get('/api/sales', async (req, res) => {
     try {
-      const userId = req.query.userId as string;
-      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-      const result = await db.select().from(sales).where(eq(sales.userId, userId));
-      res.json(result);
-    } catch (error) {
-      console.error('Error fetching sales:', error);
-      res.status(500).json({ error: 'Erro ao buscar vendas' });
+      const result = await sql`SELECT * FROM sales`;
+      const sales = result.map(s => ({
+        id: s.id,
+        clientId: s.client_id,
+        saleDate: s.sale_date,
+        productCode: s.product_code,
+        productName: s.product_name,
+        stockItemId: s.stock_item_id,
+        quantity: parseFloat(s.quantity),
+        unitPrice: parseFloat(s.unit_price),
+        total: parseFloat(s.total),
+        observation: s.observation
+      }));
+      res.json(sales);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.post('/sales', async (req, res) => {
+  app.post('/api/sales', async (req, res) => {
+    const s = req.body;
     try {
-      const { userId, ...data } = req.body;
-      const [newSale] = await db.insert(sales).values({ userId, ...data }).returning();
-      res.json(newSale);
-    } catch (error) {
-      console.error('Error creating sale:', error);
-      res.status(500).json({ error: 'Erro ao registrar venda' });
+      await sql`
+        INSERT INTO sales (id, client_id, sale_date, product_code, product_name, stock_item_id, quantity, unit_price, total, observation)
+        VALUES (${s.id}, ${s.clientId}, ${s.saleDate}, ${s.productCode}, ${s.productName}, ${s.stockItemId}, ${s.quantity}, ${s.unitPrice}, ${s.total}, ${s.observation})
+      `;
+      res.status(201).json(s);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.put('/sales/:id', async (req, res) => {
+  app.put('/api/sales/:id', async (req, res) => {
+    const { id } = req.params;
+    const s = req.body;
     try {
-      const { id } = req.params;
-      const data = req.body;
-      const [updated] = await db.update(sales).set(data).where(eq(sales.id, id)).returning();
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating sale:', error);
-      res.status(500).json({ error: 'Erro ao atualizar venda' });
+      await sql`
+        UPDATE sales SET 
+          client_id = ${s.clientId}, sale_date = ${s.saleDate}, product_code = ${s.productCode}, 
+          product_name = ${s.productName}, stock_item_id = ${s.stockItemId}, quantity = ${s.quantity}, 
+          unit_price = ${s.unitPrice}, total = ${s.total}, observation = ${s.observation}
+        WHERE id = ${id}
+      `;
+      res.json(s);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.delete('/sales/:id', async (req, res) => {
+  app.delete('/api/sales/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-      const { id } = req.params;
-      await db.delete(sales).where(eq(sales.id, id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting sale:', error);
-      res.status(500).json({ error: 'Erro ao excluir venda' });
+      await sql`DELETE FROM sales WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
   // Payments
-  apiRouter.get('/payments', async (req, res) => {
+  app.get('/api/payments', async (req, res) => {
     try {
-      const userId = req.query.userId as string;
-      if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
-      const result = await db.select().from(payments).where(eq(payments.userId, userId));
-      res.json(result);
-    } catch (error) {
-      console.error('Error fetching payments:', error);
-      res.status(500).json({ error: 'Erro ao buscar pagamentos' });
+      const result = await sql`SELECT * FROM payments`;
+      const payments = result.map(p => ({
+        id: p.id,
+        clientId: p.client_id,
+        paymentDate: p.payment_date,
+        amount: parseFloat(p.amount),
+        observation: p.observation
+      }));
+      res.json(payments);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.post('/payments', async (req, res) => {
+  app.post('/api/payments', async (req, res) => {
+    const p = req.body;
     try {
-      const { userId, ...data } = req.body;
-      const [newPayment] = await db.insert(payments).values({ userId, ...data }).returning();
-      res.json(newPayment);
-    } catch (error) {
-      console.error('Error creating payment:', error);
-      res.status(500).json({ error: 'Erro ao registrar pagamento' });
+      await sql`
+        INSERT INTO payments (id, client_id, payment_date, amount, observation)
+        VALUES (${p.id}, ${p.clientId}, ${p.paymentDate}, ${p.amount}, ${p.observation})
+      `;
+      res.status(201).json(p);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.put('/payments/:id', async (req, res) => {
+  app.put('/api/payments/:id', async (req, res) => {
+    const { id } = req.params;
+    const p = req.body;
     try {
-      const { id } = req.params;
-      const data = req.body;
-      const [updated] = await db.update(payments).set(data).where(eq(payments.id, id)).returning();
-      res.json(updated);
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      res.status(500).json({ error: 'Erro ao atualizar pagamento' });
+      await sql`
+        UPDATE payments SET 
+          client_id = ${p.clientId}, payment_date = ${p.paymentDate}, 
+          amount = ${p.amount}, observation = ${p.observation}
+        WHERE id = ${id}
+      `;
+      res.json(p);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  apiRouter.delete('/payments/:id', async (req, res) => {
+  app.delete('/api/payments/:id', async (req, res) => {
+    const { id } = req.params;
     try {
-      const { id } = req.params;
-      await db.delete(payments).where(eq(payments.id, id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting payment:', error);
-      res.status(500).json({ error: 'Erro ao excluir pagamento' });
+      await sql`DELETE FROM payments WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  // OPTIONS handler for preflights
-  apiRouter.options('*', (req, res) => {
-    res.sendStatus(200);
-  });
-
-  // Catch-all for unmatched API routes
-  apiRouter.use((req, res) => {
-    console.warn(`[API 404] Route not found: ${req.method} ${req.originalUrl}`);
-    res.status(404).json({ error: `Rota não encontrada: ${req.method} ${req.originalUrl}` });
-  });
-
-  // Mount the router
-  app.use('/api', apiRouter);
-
-  // Vite middleware for development
+  // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -368,59 +336,6 @@ async function startServer() {
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
-  }
-
-  // Seed default users if they don't exist
-  async function seed() {
-    try {
-      console.log('Checking for existing users...');
-      const existingUsers = await db.select().from(users);
-      console.log('Current users in DB:', existingUsers.map(u => ({ username: u.username, role: u.role })));
-      
-      // Ensure ivone exists with password 9860
-      const ivoneUser = existingUsers.find(u => u.username.toLowerCase() === 'ivone');
-      if (ivoneUser) {
-        console.log('Ivone user found, checking password...');
-        if (ivoneUser.password !== '9860') {
-          console.log('Updating Ivone password to 9860...');
-          await db.update(users).set({ password: '9860', username: 'ivone' }).where(eq(users.id, ivoneUser.id));
-        } else {
-          console.log('Ivone password is already 9860.');
-        }
-      } else {
-        console.log('Creating Ivone user...');
-        await db.insert(users).values({ 
-          username: 'ivone', 
-          password: '9860', 
-          role: 'user', 
-          firstName: 'Ivone', 
-          lastName: 'Silva' 
-        });
-      }
-
-      // Ensure admin exists
-      const adminUser = existingUsers.find(u => u.username === 'admin');
-      if (!adminUser) {
-        console.log('Creating Admin user...');
-        await db.insert(users).values({ 
-          username: 'admin', 
-          password: 'admin', 
-          role: 'admin', 
-          firstName: 'Admin', 
-          lastName: 'Master' 
-        });
-      }
-
-      console.log('✅ Seed concluído com sucesso.');
-    } catch (error) {
-      console.error('❌ Erro crítico no seed:', error);
-      throw error;
-    }
-  }
-  try {
-    await seed();
-  } catch (error) {
-    console.warn('⚠️ Falha ao inicializar banco de dados:', error instanceof Error ? error.message : error);
   }
 
   app.listen(PORT, '0.0.0.0', () => {

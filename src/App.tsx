@@ -1,15 +1,9 @@
 import React, { FC, useState } from 'react';
-import { useAuth } from './contexto/AuthContext';
 import { useData } from './contexto/DataContext';
 import { IvoneLayout } from './components/layout/IvoneLayout';
-import { AdminLayout } from './components/layout/AdminLayout';
-import { LoginScreen } from './components/auth/LoginScreen';
 
 // Dashboard Components
 import { Dashboard } from './components/dashboard/Dashboard';
-import { AdminDashboard } from './components/dashboard/AdminDashboard';
-import { ManageUsers } from './components/dashboard/ManageUsers';
-import { UserSummaryView } from './components/dashboard/UserSummaryView';
 import { ManageClients } from './components/dashboard/ManageClients';
 import { SalesView } from './components/dashboard/SalesView';
 import { AllPayments } from './components/dashboard/AllPayments';
@@ -31,8 +25,6 @@ import { Modal } from './components/common/Modal';
 import { Sale, Payment, View } from './types';
 
 const App: FC = () => {
-    const { currentUser, logout } = useAuth();
-    const isAuthenticated = currentUser !== null;
     const [activeView, setActiveView] = useState<View>('dashboard');
     const [toast, setToast] = useState<string | null>(null);
     
@@ -66,28 +58,11 @@ const App: FC = () => {
         setActiveView('add_payment');
     };
 
-    if (!isAuthenticated) {
-        return <LoginScreen />;
-    }
-
-    // Admin View Logic
-    if (currentUser?.role === 'admin') {
-        const adminActiveView = activeView === 'dashboard' ? 'admin_dashboard' : activeView;
-        
-        return (
-            <AdminLayout activeView={adminActiveView as any} setActiveView={setActiveView as any}>
-                {adminActiveView === 'admin_dashboard' && <AdminDashboard />}
-                {adminActiveView === 'manage_users' && <ManageUsers showToast={showToast} />}
-                {adminActiveView === 'user_summary' && <UserSummaryView />}
-            </AdminLayout>
-        );
-    }
-
     // Standard User View Logic
     return (
-        <IvoneLayout activeView={activeView as any} setActiveView={setActiveView as any} toast={toast} setToast={setToast}>
+        <IvoneLayout activeView={activeView} setActiveView={(v) => setActiveView(v as View)} toast={toast} setToast={setToast}>
             {activeView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-            {activeView === 'clients' && <ManageClients setActiveView={setActiveView} onViewClient={handleViewClient} showToast={showToast} />}
+            {activeView === 'clients' && <ManageClients setActiveView={(v) => setActiveView(v as View)} onViewClient={handleViewClient} showToast={showToast} />}
             {activeView === 'add_client' && (
                 <div className="max-w-2xl mx-auto">
                     <h1 className="text-2xl font-bold text-rose-800 mb-6">Cadastrar Novo Cliente 👤</h1>

@@ -1,5 +1,4 @@
 import React, { FC, useState } from 'react';
-import { useAuth } from '../../contexto/AuthContext';
 import { 
     HomeIcon, 
     UsersIcon, 
@@ -10,10 +9,9 @@ import {
     LogOutIcon
 } from '../ui';
 import { HeaderSummary } from './HeaderSummary';
-import { SettingsModal } from '../modals/SettingsModal';
-import { EditProfileModal } from '../modals/EditProfileModal';
 import { Toast } from '../ui';
 import { View } from '../../types';
+import { DBStatusIndicator } from './DBStatusIndicator';
 
 interface IvoneLayoutProps {
     children: React.ReactNode;
@@ -24,10 +22,6 @@ interface IvoneLayoutProps {
 }
 
 export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, toast, setToast }) => {
-    const { currentUser, logout } = useAuth();
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isProfileOpen, setIsProfileOpen] = useState(false);
-
     const mobileNavItems = [
         { id: 'dashboard', icon: HomeIcon, label: 'Início' },
         { id: 'clients', icon: UsersIcon, label: 'Clientes' },
@@ -38,27 +32,13 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
 
     return (
         <div className="min-h-screen bg-[#fdf2f5] flex flex-col pb-20 md:pb-0">
+            <DBStatusIndicator />
             {/* Top Bar */}
             <header className="p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
                 <div className="flex-1 flex justify-center md:justify-start">
                     <h1 className="text-xl md:text-2xl font-black text-[#e91e63] flex items-center gap-2">
-                        Olá, {currentUser?.firstName}! ❤️ ✨
+                        Olá, Ivone! ❤️ ✨
                     </h1>
-                </div>
-                <div className="absolute right-4 top-4 flex items-center gap-2">
-                    <button 
-                        onClick={() => setIsSettingsOpen(true)}
-                        className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[#e91e63] shadow-sm hover:bg-pink-50 transition-colors hidden md:flex"
-                        title="Configurações"
-                    >
-                        <SettingsIcon className="w-5 h-5" />
-                    </button>
-                    <button 
-                        onClick={() => setIsProfileOpen(true)}
-                        className="w-10 h-10 rounded-full bg-[#e91e63] flex items-center justify-center text-white font-bold shadow-md hover:scale-105 transition-transform active:scale-95"
-                    >
-                        {currentUser?.firstName?.substring(0, 1)}{currentUser?.lastName?.substring(0, 1) || ''}
-                    </button>
                 </div>
             </header>
 
@@ -89,10 +69,6 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                     </button>
                 ))}
             </nav>
-
-            {/* Modals */}
-            <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} showToast={setToast} />
-            <EditProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} showToast={setToast} />
 
             {/* Toast Notifications */}
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}

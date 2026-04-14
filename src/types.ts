@@ -43,15 +43,6 @@ export interface Payment {
   observation: string;
 }
 
-export interface User {
-  id: string;
-  username: string;
-  password: string;
-  role: 'admin' | 'user';
-  firstName: string;
-  lastName: string;
-}
-
 export type View = 
   | 'dashboard' 
   | 'clients' 
@@ -64,7 +55,4 @@ export type View =
   | 'pending_payments' 
   | 'sales_view' 
   | 'all_payments' 
-  | 'client_detail' 
-  | 'manage_users' 
-  | 'user_summary' 
-  | 'admin_dashboard';
+  | 'client_detail';

@@ -1,20 +1,5 @@
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useCallback } from 'react';
 import { Client, StockItem, Sale, Payment } from '../types';
-import { useAuth } from './AuthContext';
-
-interface RawData {
-  clients: Client[];
-  stockItems: StockItem[];
-  sales: Sale[];
-  payments: Payment[];
-}
-
-const initialData: RawData = {
-    clients: [],
-    stockItems: [],
-    sales: [],
-    payments: [],
-};
 
 interface DataContextType {
   clients: Client[];
@@ -40,223 +25,241 @@ interface DataContextType {
 
   clientBalances: Map<string, number>;
   isLoading: boolean;
+  dbStatus: 'connected' | 'error' | 'checking';
+  dbErrorMessage: string | null;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
-  const [data, setData] = useState<RawData>(initialData);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dbStatus, setDbStatus] = useState<'connected' | 'error' | 'checking'>('checking');
+  const [dbErrorMessage, setDbErrorMessage] = useState<string | null>(null);
+
+  const checkDbStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      if (res.ok && data.status === 'connected') {
+        setDbStatus('connected');
+        setDbErrorMessage(null);
+      } else {
+        setDbStatus('error');
+        setDbErrorMessage(data.message || 'Erro desconhecido ao conectar ao banco.');
+      }
+    } catch (error) {
+      setDbStatus('error');
+      setDbErrorMessage('Não foi possível alcançar o servidor.');
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!currentUser || !uuidRegex.test(currentUser.id)) {
-      setData(initialData);
-      setIsLoading(false);
-      return;
-    }
     setIsLoading(true);
+    await checkDbStatus();
     try {
-      const fetchJson = async (url: string) => {
-        const res = await fetch(url);
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(`API Error (${res.status}): ${text.substring(0, 100)}`);
-        }
-        return res.json();
-      };
-
       const [clientsRes, stockRes, salesRes, paymentsRes] = await Promise.all([
-        fetchJson(`/api/clients?userId=${currentUser.id}`),
-        fetchJson(`/api/stock?userId=${currentUser.id}`),
-        fetchJson(`/api/sales?userId=${currentUser.id}`),
-        fetchJson(`/api/payments?userId=${currentUser.id}`),
+        fetch('/api/clients'),
+        fetch('/api/stock'),
+        fetch('/api/sales'),
+        fetch('/api/payments')
       ]);
-      setData({
-        clients: clientsRes,
-        stockItems: stockRes,
-        sales: salesRes,
-        payments: paymentsRes,
-      });
+
+      const [clientsData, stockData, salesData, paymentsData] = await Promise.all([
+        clientsRes.json(),
+        stockRes.json(),
+        salesRes.json(),
+        paymentsRes.json()
+      ]);
+
+      setClients(clientsData);
+      setStockItems(stockData);
+      setSales(salesData);
+      setPayments(paymentsData);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      console.error('Error fetching data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id'>) => {
-    if (!currentUser) return;
+    const newClient: Client = { ...clientData, id: crypto.randomUUID() };
     const res = await fetch('/api/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...clientData, userId: currentUser.id }),
+      body: JSON.stringify(newClient)
     });
-    const newClient = await res.json();
-    setData(prev => ({ ...prev, clients: [...prev.clients, newClient] }));
-  }, [currentUser]);
+    if (res.ok) {
+      setClients(prev => [...prev, newClient]);
+    }
+  }, []);
 
   const updateClient = useCallback(async (updatedClient: Client) => {
-    await fetch(`/api/clients/${updatedClient.id}`, {
+    const res = await fetch(`/api/clients/${updatedClient.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedClient),
+      body: JSON.stringify(updatedClient)
     });
-    setData(prev => ({ ...prev, clients: prev.clients.map(c => c.id === updatedClient.id ? updatedClient : c) }));
+    if (res.ok) {
+      setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+    }
   }, []);
 
   const deleteClient = useCallback(async (clientId: string) => {
-    await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
-    setData(prev => ({ ...prev, clients: prev.clients.filter(c => c.id !== clientId) }));
+    const res = await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+    if (res.ok) {
+      setClients(prev => prev.filter(c => c.id !== clientId));
+    }
   }, []);
   
-  const getClientById = useCallback((clientId: string) => data.clients.find(c => c.id === clientId), [data.clients]);
+  const getClientById = useCallback((clientId: string) => clients.find(c => c.id === clientId), [clients]);
 
   const addStockItem = useCallback(async (itemData: Omit<StockItem, 'id'>) => {
-    if (!currentUser) return;
+    const newItem: StockItem = { ...itemData, id: crypto.randomUUID() };
     const res = await fetch('/api/stock', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...itemData, userId: currentUser.id }),
+      body: JSON.stringify(newItem)
     });
-    const newItem = await res.json();
-    setData(prev => ({ ...prev, stockItems: [...prev.stockItems, newItem] }));
-  }, [currentUser]);
+    if (res.ok) {
+      setStockItems(prev => [...prev, newItem]);
+    }
+  }, []);
 
   const updateStockItemQuantity = useCallback(async (itemId: string, newQuantity: number) => {
-    await fetch(`/api/stock/${itemId}`, {
-      method: 'PUT',
+    const res = await fetch(`/api/stock/${itemId}`, {
+      method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: newQuantity }),
+      body: JSON.stringify({ quantity: newQuantity })
     });
-    setData(prev => ({ ...prev, stockItems: prev.stockItems.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item) }));
+    if (res.ok) {
+      setStockItems(prev => prev.map(item => item.id === itemId ? { ...item, quantity: newQuantity } : item));
+    }
   }, []);
   
   const deleteStockItem = useCallback(async (itemId: string) => {
-    await fetch(`/api/stock/${itemId}`, { method: 'DELETE' });
-    setData(prev => ({ ...prev, stockItems: prev.stockItems.filter(item => item.id !== itemId) }));
+    const res = await fetch(`/api/stock/${itemId}`, { method: 'DELETE' });
+    if (res.ok) {
+      setStockItems(prev => prev.filter(item => item.id !== itemId));
+    }
   }, []);
 
   const addSale = useCallback(async (saleData: Omit<Sale, 'id'|'total'>) => {
-    if (!currentUser) throw new Error("User not logged in");
     const total = parseFloat((saleData.quantity * saleData.unitPrice).toFixed(2));
+    const newSale: Sale = { ...saleData, id: crypto.randomUUID(), total };
     
-    // Check stock locally first for immediate feedback
+    // Check stock locally first (optional but good for UX)
     if (saleData.stockItemId) {
-        const item = data.stockItems.find(i => i.id === saleData.stockItemId);
-        if (item && item.quantity < saleData.quantity) {
-            throw new Error("Estoque insuficiente.");
-        }
+      const item = stockItems.find(i => i.id === saleData.stockItemId);
+      if (item && item.quantity < saleData.quantity) {
+        throw new Error("Estoque insuficiente.");
+      }
     }
 
     const res = await fetch('/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...saleData, total, userId: currentUser.id }),
+      body: JSON.stringify(newSale)
     });
-    const newSale = await res.json();
-    
-    // Update stock in DB
-    if (saleData.stockItemId) {
-        const item = data.stockItems.find(i => i.id === saleData.stockItemId);
-        if (item) {
-            await updateStockItemQuantity(item.id, item.quantity - saleData.quantity);
-        }
-    }
 
-    setData(prev => ({ ...prev, sales: [...prev.sales, newSale] }));
-    return newSale;
-  }, [currentUser, data.stockItems, updateStockItemQuantity]);
+    if (res.ok) {
+      setSales(prev => [...prev, newSale]);
+      // Update stock locally
+      if (saleData.stockItemId) {
+        const item = stockItems.find(i => i.id === saleData.stockItemId);
+        if (item) {
+          await updateStockItemQuantity(item.id, item.quantity - saleData.quantity);
+        }
+      }
+      return newSale;
+    } else {
+      throw new Error("Erro ao registrar venda no servidor.");
+    }
+  }, [stockItems, updateStockItemQuantity]);
   
   const updateSale = useCallback(async (updatedSale: Sale) => {
     const total = parseFloat((updatedSale.quantity * updatedSale.unitPrice).toFixed(2));
     const finalSaleData = { ...updatedSale, total };
 
-    const originalSale = data.sales.find(s => s.id === updatedSale.id);
-    if (!originalSale) throw new Error("Venda original não encontrada");
-
-    // Revert and apply stock changes
-    if (originalSale.stockItemId === updatedSale.stockItemId && originalSale.stockItemId) {
-        const item = data.stockItems.find(i => i.id === originalSale.stockItemId);
-        if (item) {
-            const diff = updatedSale.quantity - originalSale.quantity;
-            if (item.quantity < diff) throw new Error("Estoque insuficiente");
-            await updateStockItemQuantity(item.id, item.quantity - diff);
-        }
-    }
-
-    await fetch(`/api/sales/${updatedSale.id}`, {
+    const res = await fetch(`/api/sales/${updatedSale.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(finalSaleData),
+      body: JSON.stringify(finalSaleData)
     });
 
-    setData(prev => ({ ...prev, sales: prev.sales.map(s => s.id === updatedSale.id ? finalSaleData : s) }));
-    return finalSaleData;
-  }, [data.sales, data.stockItems, updateStockItemQuantity]);
+    if (res.ok) {
+      // For simplicity, we refetch all data to ensure stock is correct after complex update
+      await fetchData();
+      return finalSaleData;
+    } else {
+      throw new Error("Erro ao atualizar venda no servidor.");
+    }
+  }, [fetchData]);
 
   const deleteSale = useCallback(async (saleId: string) => {
-    const saleToDelete = data.sales.find(s => s.id === saleId);
-    if (!saleToDelete) return;
-
-    if (saleToDelete.stockItemId) {
-        const item = data.stockItems.find(i => i.id === saleToDelete.stockItemId);
-        if (item) {
-            await updateStockItemQuantity(item.id, item.quantity + saleToDelete.quantity);
-        }
+    const res = await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
+    if (res.ok) {
+      await fetchData();
     }
-
-    await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
-    setData(prev => ({ ...prev, sales: prev.sales.filter(s => s.id !== saleId) }));
-  }, [data.sales, data.stockItems, updateStockItemQuantity]);
+  }, [fetchData]);
 
   const addPayment = useCallback(async (paymentData: Omit<Payment, 'id'>) => {
-    if (!currentUser) return;
+    const newPayment: Payment = { ...paymentData, id: crypto.randomUUID() };
     const res = await fetch('/api/payments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...paymentData, userId: currentUser.id }),
+      body: JSON.stringify(newPayment)
     });
-    const newPayment = await res.json();
-    setData(prev => ({ ...prev, payments: [...prev.payments, newPayment] }));
-  }, [currentUser]);
+    if (res.ok) {
+      setPayments(prev => [...prev, newPayment]);
+    }
+  }, []);
   
   const updatePayment = useCallback(async (updatedPayment: Payment) => {
-    await fetch(`/api/payments/${updatedPayment.id}`, {
+    const res = await fetch(`/api/payments/${updatedPayment.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedPayment),
+      body: JSON.stringify(updatedPayment)
     });
-    setData(prev => ({ ...prev, payments: prev.payments.map(p => p.id === updatedPayment.id ? updatedPayment : p) }));
+    if (res.ok) {
+      setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
+    }
   }, []);
 
   const deletePayment = useCallback(async (paymentId: string) => {
-    await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
-    setData(prev => ({ ...prev, payments: prev.payments.filter(p => p.id !== paymentId) }));
+    const res = await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
+    if (res.ok) {
+      setPayments(prev => prev.filter(p => p.id !== paymentId));
+    }
   }, []);
 
   const clientBalances = useMemo(() => {
     const balances = new Map<string, number>();
-    (data.clients || []).forEach(client => {
-        const totalSales = (data.sales || []).filter(s => s.clientId === client.id).reduce((sum, s) => sum + s.total, 0);
-        const totalPayments = (data.payments || []).filter(p => p.clientId === client.id).reduce((sum, p) => sum + p.amount, 0);
+    clients.forEach(client => {
+        const totalSales = sales.filter(s => s.clientId === client.id).reduce((sum, s) => sum + s.total, 0);
+        const totalPayments = payments.filter(p => p.clientId === client.id).reduce((sum, p) => sum + p.amount, 0);
         balances.set(client.id, totalSales - totalPayments);
     });
     return balances;
-  }, [data.clients, data.sales, data.payments]);
-  
+  }, [clients, sales, payments]);
+
   const value = {
-    clients: data.clients || [], addClient, updateClient, deleteClient, getClientById,
-    stockItems: data.stockItems || [], addStockItem, updateStockItemQuantity, deleteStockItem,
-    sales: data.sales || [], addSale, updateSale, deleteSale,
-    payments: data.payments || [], addPayment, updatePayment, deletePayment,
+    clients, addClient, updateClient, deleteClient, getClientById,
+    stockItems, addStockItem, updateStockItemQuantity, deleteStockItem,
+    sales, addSale, updateSale, deleteSale,
+    payments, addPayment, updatePayment, deletePayment,
     clientBalances,
     isLoading,
+    dbStatus,
+    dbErrorMessage,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
