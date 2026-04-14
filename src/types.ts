@@ -50,7 +50,6 @@ export interface User {
   role: 'admin' | 'user';
   firstName: string;
   lastName: string;
-  theme?: 'default' | 'neon-chic';
 }
 
 export type View = 
