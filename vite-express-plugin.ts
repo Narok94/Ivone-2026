@@ -306,6 +306,123 @@ export function expressApiPlugin(): Plugin {
             return;
           }
 
+          // Backup route - export all data
+          if (pathname === '/api/backup' && req.method === 'GET') {
+            const userId = query.userId as string;
+            if (!userId || !isUUID(userId)) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Valid userId required' }));
+              return;
+            }
+            
+            const allClients = await db.select().from(clients).where(eq(clients.userId, userId));
+            const allStock = await db.select().from(stockItems).where(eq(stockItems.userId, userId));
+            const allSales = await db.select().from(sales).where(eq(sales.userId, userId));
+            const allPayments = await db.select().from(payments).where(eq(payments.userId, userId));
+            
+            const backup = {
+              version: '1.0',
+              exportDate: new Date().toISOString(),
+              userId,
+              data: {
+                clients: allClients,
+                stockItems: allStock,
+                sales: allSales,
+                payments: allPayments
+              }
+            };
+            
+            res.end(JSON.stringify(backup));
+            return;
+          }
+
+          // Restore route - import data from backup
+          if (pathname === '/api/restore' && req.method === 'POST') {
+            const { userId, data, clearExisting } = body;
+            
+            if (!userId || !isUUID(userId)) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ error: 'Valid userId required' }));
+              return;
+            }
+            
+            try {
+              // If clearExisting, delete all existing data for this user
+              if (clearExisting) {
+                await db.delete(payments).where(eq(payments.userId, userId));
+                await db.delete(sales).where(eq(sales.userId, userId));
+                await db.delete(stockItems).where(eq(stockItems.userId, userId));
+                await db.delete(clients).where(eq(clients.userId, userId));
+              }
+              
+              let imported = { clients: 0, stockItems: 0, sales: 0, payments: 0 };
+              
+              // Map old IDs to new IDs
+              const clientIdMap: Record<string, string> = {};
+              const stockIdMap: Record<string, string> = {};
+              
+              // Import clients
+              if (data.clients && Array.isArray(data.clients)) {
+                for (const client of data.clients) {
+                  const oldId = client.id;
+                  const { id, createdAt, ...clientData } = client;
+                  const [newClient] = await db.insert(clients).values({ ...clientData, userId }).returning();
+                  clientIdMap[oldId] = newClient.id;
+                  imported.clients++;
+                }
+              }
+              
+              // Import stock items
+              if (data.stockItems && Array.isArray(data.stockItems)) {
+                for (const item of data.stockItems) {
+                  const oldId = item.id;
+                  const { id, createdAt, ...itemData } = item;
+                  const [newItem] = await db.insert(stockItems).values({ ...itemData, userId }).returning();
+                  stockIdMap[oldId] = newItem.id;
+                  imported.stockItems++;
+                }
+              }
+              
+              // Import sales (with mapped client and stock IDs)
+              if (data.sales && Array.isArray(data.sales)) {
+                for (const sale of data.sales) {
+                  const { id, createdAt, clientId, stockItemId, ...saleData } = sale;
+                  const newClientId = clientIdMap[clientId] || clientId;
+                  const newStockId = stockItemId ? (stockIdMap[stockItemId] || stockItemId) : null;
+                  await db.insert(sales).values({ 
+                    ...saleData, 
+                    userId, 
+                    clientId: newClientId,
+                    stockItemId: newStockId
+                  });
+                  imported.sales++;
+                }
+              }
+              
+              // Import payments (with mapped client IDs)
+              if (data.payments && Array.isArray(data.payments)) {
+                for (const payment of data.payments) {
+                  const { id, createdAt, clientId, ...paymentData } = payment;
+                  const newClientId = clientIdMap[clientId] || clientId;
+                  await db.insert(payments).values({ 
+                    ...paymentData, 
+                    userId,
+                    clientId: newClientId
+                  });
+                  imported.payments++;
+                }
+              }
+              
+              res.end(JSON.stringify({ success: true, imported }));
+              return;
+            } catch (error) {
+              console.error('[v0] Restore error:', error);
+              res.statusCode = 500;
+              res.end(JSON.stringify({ error: error instanceof Error ? error.message : 'Erro ao restaurar backup' }));
+              return;
+            }
+          }
+
           // Not found
           res.statusCode = 404;
           res.end(JSON.stringify({ error: `Rota não encontrada: ${req.method} ${pathname}` }));
