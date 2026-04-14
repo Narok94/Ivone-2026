@@ -1,6 +1,6 @@
 import { pgTable, text, timestamp, doublePrecision, integer, uuid } from 'drizzle-orm/pg-core';
 
-export const users = pgTable('users', {
+export const users = pgTable('ivone_users', {
   id: uuid('id').primaryKey().defaultRandom(),
   username: text('username').notNull().unique(),
   password: text('password').notNull(),
@@ -10,7 +10,7 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export const clients = pgTable('clients', {
+export const clients = pgTable('ivone_clients', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   fullName: text('full_name').notNull(),
@@ -28,7 +28,7 @@ export const clients = pgTable('clients', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export const stockItems = pgTable('stock_items', {
+export const stockItems = pgTable('ivone_stock_items', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   name: text('name').notNull(),
@@ -38,7 +38,7 @@ export const stockItems = pgTable('stock_items', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export const sales = pgTable('sales', {
+export const sales = pgTable('ivone_sales', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   clientId: uuid('client_id').references(() => clients.id).notNull(),
@@ -53,7 +53,7 @@ export const sales = pgTable('sales', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
-export const payments = pgTable('payments', {
+export const payments = pgTable('ivone_payments', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id).notNull(),
   clientId: uuid('client_id').references(() => clients.id).notNull(),

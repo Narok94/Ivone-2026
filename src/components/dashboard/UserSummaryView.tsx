@@ -13,7 +13,6 @@ interface RawData {
 }
 
 const UserDetailSummary: FC<{ user: User }> = ({ user }) => {
-    const { getRawData } = useData();
     const [userData, setUserData] = useState<RawData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -21,8 +20,18 @@ const UserDetailSummary: FC<{ user: User }> = ({ user }) => {
         const loadData = async () => {
             setIsLoading(true);
             try {
-                const data = await getRawData(user.id);
-                setUserData(data);
+                const [clientsRes, stockRes, salesRes, paymentsRes] = await Promise.all([
+                    fetch(`/api/clients?userId=${user.id}`).then(res => res.json()),
+                    fetch(`/api/stock?userId=${user.id}`).then(res => res.json()),
+                    fetch(`/api/sales?userId=${user.id}`).then(res => res.json()),
+                    fetch(`/api/payments?userId=${user.id}`).then(res => res.json()),
+                ]);
+                setUserData({
+                    clients: clientsRes,
+                    stockItems: stockRes,
+                    sales: salesRes,
+                    payments: paymentsRes,
+                });
             } catch (error) {
                 console.error("Failed to load user data:", error);
                 setUserData(null);
@@ -31,7 +40,7 @@ const UserDetailSummary: FC<{ user: User }> = ({ user }) => {
             }
         };
         loadData();
-    }, [user.id, getRawData]);
+    }, [user.id]);
 
     const stats = useMemo(() => {
         if (!userData) return { totalSales: 0, totalReceived: 0, totalPending: 0, clientCount: 0 };

@@ -12,6 +12,8 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const isUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
 async function startServer() {
   const app = express();
   const PORT = 3000;
@@ -50,7 +52,7 @@ async function startServer() {
   // Clients
   app.get('/api/clients', async (req, res) => {
     const userId = req.query.userId as string;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
     const result = await db.select().from(clients).where(eq(clients.userId, userId));
     res.json(result);
   });
@@ -77,7 +79,7 @@ async function startServer() {
   // Stock
   app.get('/api/stock', async (req, res) => {
     const userId = req.query.userId as string;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
     const result = await db.select().from(stockItems).where(eq(stockItems.userId, userId));
     res.json(result);
   });
@@ -104,7 +106,7 @@ async function startServer() {
   // Sales
   app.get('/api/sales', async (req, res) => {
     const userId = req.query.userId as string;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
     const result = await db.select().from(sales).where(eq(sales.userId, userId));
     res.json(result);
   });
@@ -131,7 +133,7 @@ async function startServer() {
   // Payments
   app.get('/api/payments', async (req, res) => {
     const userId = req.query.userId as string;
-    if (!userId) return res.status(400).json({ error: 'userId required' });
+    if (!userId || !isUUID(userId)) return res.status(400).json({ error: 'Valid userId required' });
     const result = await db.select().from(payments).where(eq(payments.userId, userId));
     res.json(result);
   });
@@ -225,7 +227,11 @@ async function startServer() {
       ]);
     }
   }
-  await seed();
+  try {
+    await seed();
+  } catch (error) {
+    console.warn('⚠️ Erro ao executar seed (provavelmente DATABASE_URL não configurada):', error instanceof Error ? error.message : error);
+  }
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);

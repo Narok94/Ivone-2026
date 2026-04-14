@@ -38,9 +38,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, []);
 
+  const logout = useCallback(() => {
+    setCurrentUser(null);
+    localStorage.removeItem('currentUser'); // Force clear
+  }, [setCurrentUser]);
+
   useEffect(() => {
+    // Validate currentUser ID is a UUID (to clear legacy '1', '2' IDs)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (currentUser && !uuidRegex.test(currentUser.id)) {
+      console.warn('Legacy user ID detected, logging out...');
+      logout();
+      return; // Stop here
+    }
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers, currentUser, logout]);
   
   const login = useCallback(async (username: string, pass: string) => {
     const res = await fetch('/api/auth/login', {
@@ -57,10 +69,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [setCurrentUser]);
 
-  const logout = useCallback(() => {
-    setCurrentUser(null);
-  }, [setCurrentUser]);
-  
   const addUser = useCallback(async (username: string, pass: string, firstName: string, lastName: string) => {
       const res = await fetch('/api/users', {
           method: 'POST',

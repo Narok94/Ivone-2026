@@ -50,18 +50,28 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!currentUser) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!currentUser || !uuidRegex.test(currentUser.id)) {
       setData(initialData);
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
+      const fetchJson = async (url: string) => {
+        const res = await fetch(url);
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`API Error (${res.status}): ${text.substring(0, 100)}`);
+        }
+        return res.json();
+      };
+
       const [clientsRes, stockRes, salesRes, paymentsRes] = await Promise.all([
-        fetch(`/api/clients?userId=${currentUser.id}`).then(res => res.json()),
-        fetch(`/api/stock?userId=${currentUser.id}`).then(res => res.json()),
-        fetch(`/api/sales?userId=${currentUser.id}`).then(res => res.json()),
-        fetch(`/api/payments?userId=${currentUser.id}`).then(res => res.json()),
+        fetchJson(`/api/clients?userId=${currentUser.id}`),
+        fetchJson(`/api/stock?userId=${currentUser.id}`),
+        fetchJson(`/api/sales?userId=${currentUser.id}`),
+        fetchJson(`/api/payments?userId=${currentUser.id}`),
       ]);
       setData({
         clients: clientsRes,

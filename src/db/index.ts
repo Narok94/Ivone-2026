@@ -5,9 +5,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required');
+const databaseUrl = process.env.DATABASE_URL;
+
+if (!databaseUrl) {
+  console.warn('⚠️ DATABASE_URL não configurada. A aplicação funcionará em modo limitado.');
 }
 
-const sql = neon(process.env.DATABASE_URL);
+const sql = neon(databaseUrl || '');
 export const db = drizzle(sql, { schema });

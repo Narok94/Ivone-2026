@@ -4,10 +4,8 @@ import {
     LayoutDashboardIcon, 
     UsersIcon, 
     ShieldIcon, 
-    LogOutIcon, 
-    DatabaseIcon 
+    LogOutIcon 
 } from '../ui';
-import { BackupRestoreModal } from '../modals/BackupRestoreModal';
 import { View } from '../../types';
 
 interface AdminLayoutProps {
@@ -47,13 +45,6 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, activeView, setAct
                             <div className="h-6 w-px bg-slate-700 mx-1"></div>
                             
                             <div className="flex items-center gap-1">
-                                <button 
-                                    onClick={() => setIsBackupModalOpen(true)}
-                                    className="p-2 text-slate-400 hover:bg-slate-800 rounded-xl transition-colors"
-                                    title="Backup & Restore"
-                                >
-                                    <DatabaseIcon className="w-5 h-5" />
-                                </button>
                                 <button 
                                     onClick={logout}
                                     className="p-2 text-rose-400 hover:bg-rose-400/10 rounded-xl transition-colors"
@@ -103,8 +94,6 @@ export const AdminLayout: FC<AdminLayoutProps> = ({ children, activeView, setAct
                     {children}
                 </div>
             </main>
-            
-            <BackupRestoreModal isOpen={isBackupModalOpen} onClose={() => setIsBackupModalOpen(false)} />
         </div>
     );
 };
