@@ -18,10 +18,21 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  const sql = neon(process.env.DATABASE_URL!);
+  const dbUrl = process.env.DATABASE_URL;
+  const sql = dbUrl ? neon(dbUrl) : null;
+
+  // Middleware to check DB connection for all /api routes except health
+  app.use('/api', (req, res, next) => {
+    if (req.path === '/health') return next();
+    if (!sql) {
+      return res.status(500).json({ error: 'Banco de dados não configurado. Verifique a variável DATABASE_URL nas configurações do projeto.' });
+    }
+    next();
+  });
 
   // --- DATABASE INITIALIZATION ---
   async function initDb() {
+    if (!sql) return;
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS clients (
@@ -75,17 +86,24 @@ async function startServer() {
       console.log('Database tables initialized');
     } catch (err) {
       console.error('Error initializing database:', err);
+      // Don't rethrow, let the server start
     }
   }
 
-  if (process.env.DATABASE_URL) {
-    await initDb();
+  if (dbUrl) {
+    initDb(); // Run in background to not block server start
   }
 
   // --- API ROUTES ---
 
   // Health check
   app.get('/api/health', async (req, res) => {
+    if (!dbUrl) {
+      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada no Vercel/Settings.' });
+    }
+    if (!sql) {
+      return res.status(500).json({ status: 'error', message: 'Falha ao inicializar cliente Neon.' });
+    }
     try {
       await sql`SELECT 1`;
       res.json({ status: 'connected' });
