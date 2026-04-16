@@ -30,12 +30,12 @@ async function startServer() {
   let sql = dbUrl ? neon(dbUrl) : null;
 
   // Health check - TOP PRIORITY
-  app.get('/api/health', async (req, res) => {
-    console.log('[API] Health check requested');
+  app.get(['/api/health', '/health'], async (req, res) => {
+    console.log(`[DEBUG] Health check requested via ${req.url}`);
     const currentDbUrl = process.env.DATABASE_URL;
     
     if (!currentDbUrl) {
-      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada.' });
+      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada nos Secrets.' });
     }
 
     if (!sql || currentDbUrl !== dbUrl) {
@@ -47,7 +47,7 @@ async function startServer() {
       await sql`SELECT 1`;
       res.json({ status: 'connected' });
     } catch (err) {
-      console.error('[API] Health check failed:', err);
+      console.error('[DEBUG] Health check failed:', err);
       res.status(500).json({ status: 'error', message: (err as Error).message });
     }
   });
@@ -73,6 +73,11 @@ async function startServer() {
   // Health check
 
   app.use('/api', apiRouter);
+
+  // Catch-all for /api to prevent falling through to HTML
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({ error: `Rota de API não encontrada: ${req.method} ${req.url}` });
+  });
 
   // Clients
   apiRouter.get('/clients', async (req, res) => {
