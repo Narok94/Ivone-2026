@@ -18,28 +18,289 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Request logging
+  app.use((req, res, next) => {
+    if (req.url.startsWith('/api')) {
+      console.log(`${req.method} ${req.url}`);
+    }
+    next();
+  });
+
   let dbUrl = process.env.DATABASE_URL;
   let sql = dbUrl ? neon(dbUrl) : null;
 
+  // --- API ROUTES ---
+  const apiRouter = express.Router();
+
   // Middleware to check DB connection for all /api routes except health
-  app.use('/api', (req, res, next) => {
-    if (req.path === '/health') return next();
+  apiRouter.use((req, res, next) => {
+    if (req.path === '/health' || req.path === '/health/') return next();
     
-    // Try to re-initialize if it was missing
     if (!sql && process.env.DATABASE_URL) {
       dbUrl = process.env.DATABASE_URL;
       sql = neon(dbUrl);
     }
 
     if (!sql) {
-      return res.status(500).json({ error: 'Banco de dados não configurado. Verifique a variável DATABASE_URL nas configurações do projeto.' });
+      return res.status(500).json({ error: 'Banco de dados não configurado.' });
     }
     next();
   });
 
+  // Health check
+  apiRouter.get('/health', async (req, res) => {
+    const currentDbUrl = process.env.DATABASE_URL;
+    
+    if (!currentDbUrl) {
+      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada.' });
+    }
+
+    if (!sql || currentDbUrl !== dbUrl) {
+      dbUrl = currentDbUrl;
+      sql = neon(dbUrl);
+    }
+
+    try {
+      await sql`SELECT 1`;
+      res.json({ status: 'connected' });
+    } catch (err) {
+      console.error('Health check failed:', err);
+      res.status(500).json({ status: 'error', message: (err as Error).message });
+    }
+  });
+
+  // Clients
+  apiRouter.get('/clients', async (req, res) => {
+    try {
+      const result = await sql`SELECT * FROM clients`;
+      const clients = result.map(c => ({
+        id: c.id,
+        fullName: c.full_name,
+        cep: c.cep,
+        street: c.street,
+        number: c.number,
+        complement: c.complement,
+        neighborhood: c.neighborhood,
+        city: c.city,
+        state: c.state,
+        phone: c.phone,
+        email: c.email,
+        cpf: c.cpf,
+        observation: c.observation
+      }));
+      res.json(clients);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.post('/clients', async (req, res) => {
+    const c = req.body;
+    try {
+      await sql`
+        INSERT INTO clients (id, full_name, cep, street, number, complement, neighborhood, city, state, phone, email, cpf, observation)
+        VALUES (${c.id}, ${c.fullName}, ${c.cep}, ${c.street}, ${c.number}, ${c.complement}, ${c.neighborhood}, ${c.city}, ${c.state}, ${c.phone}, ${c.email}, ${c.cpf}, ${c.observation})
+      `;
+      res.status(201).json(c);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.put('/clients/:id', async (req, res) => {
+    const { id } = req.params;
+    const c = req.body;
+    try {
+      await sql`
+        UPDATE clients SET 
+          full_name = ${c.fullName}, cep = ${c.cep}, street = ${c.street}, number = ${c.number}, 
+          complement = ${c.complement}, neighborhood = ${c.neighborhood}, city = ${c.city}, 
+          state = ${c.state}, phone = ${c.phone}, email = ${c.email}, cpf = ${c.cpf}, 
+          observation = ${c.observation}
+        WHERE id = ${id}
+      `;
+      res.json(c);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.delete('/clients/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await sql`DELETE FROM clients WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Stock Items
+  apiRouter.get('/stock', async (req, res) => {
+    try {
+      const result = await sql`SELECT * FROM stock_items`;
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.post('/stock', async (req, res) => {
+    const item = req.body;
+    try {
+      await sql`
+        INSERT INTO stock_items (id, name, size, code, quantity)
+        VALUES (${item.id}, ${item.name}, ${item.size}, ${item.code}, ${item.quantity})
+      `;
+      res.status(201).json(item);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.patch('/stock/:id', async (req, res) => {
+    const { id } = req.params;
+    const { quantity } = req.body;
+    try {
+      await sql`UPDATE stock_items SET quantity = ${quantity} WHERE id = ${id}`;
+      res.json({ id, quantity });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.delete('/stock/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await sql`DELETE FROM stock_items WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Sales
+  apiRouter.get('/sales', async (req, res) => {
+    try {
+      const result = await sql`SELECT * FROM sales`;
+      const sales = result.map(s => ({
+        id: s.id,
+        clientId: s.client_id,
+        saleDate: s.sale_date,
+        productCode: s.product_code,
+        productName: s.product_name,
+        stockItemId: s.stock_item_id,
+        quantity: parseFloat(s.quantity),
+        unitPrice: parseFloat(s.unit_price),
+        total: parseFloat(s.total),
+        observation: s.observation
+      }));
+      res.json(sales);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.post('/sales', async (req, res) => {
+    const s = req.body;
+    try {
+      await sql`
+        INSERT INTO sales (id, client_id, sale_date, product_code, product_name, stock_item_id, quantity, unit_price, total, observation)
+        VALUES (${s.id}, ${s.clientId}, ${s.saleDate}, ${s.productCode}, ${s.productName}, ${s.stockItemId}, ${s.quantity}, ${s.unitPrice}, ${s.total}, ${s.observation})
+      `;
+      res.status(201).json(s);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.put('/sales/:id', async (req, res) => {
+    const { id } = req.params;
+    const s = req.body;
+    try {
+      await sql`
+        UPDATE sales SET 
+          client_id = ${s.clientId}, sale_date = ${s.saleDate}, product_code = ${s.productCode}, 
+          product_name = ${s.productName}, stock_item_id = ${s.stockItemId}, quantity = ${s.quantity}, 
+          unit_price = ${s.unitPrice}, total = ${s.total}, observation = ${s.observation}
+        WHERE id = ${id}
+      `;
+      res.json(s);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.delete('/sales/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await sql`DELETE FROM sales WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Payments
+  apiRouter.get('/payments', async (req, res) => {
+    try {
+      const result = await sql`SELECT * FROM payments`;
+      const payments = result.map(p => ({
+        id: p.id,
+        clientId: p.client_id,
+        paymentDate: p.payment_date,
+        amount: parseFloat(p.amount),
+        observation: p.observation
+      }));
+      res.json(payments);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.post('/payments', async (req, res) => {
+    const p = req.body;
+    try {
+      await sql`
+        INSERT INTO payments (id, client_id, payment_date, amount, observation)
+        VALUES (${p.id}, ${p.clientId}, ${p.paymentDate}, ${p.amount}, ${p.observation})
+      `;
+      res.status(201).json(p);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.put('/payments/:id', async (req, res) => {
+    const { id } = req.params;
+    const p = req.body;
+    try {
+      await sql`
+        UPDATE payments SET 
+          client_id = ${p.clientId}, payment_date = ${p.paymentDate}, 
+          amount = ${p.amount}, observation = ${p.observation}
+        WHERE id = ${id}
+      `;
+      res.json(p);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  apiRouter.delete('/payments/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      await sql`DELETE FROM payments WHERE id = ${id}`;
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.use('/api', apiRouter);
+
   // --- DATABASE INITIALIZATION ---
   async function initDb() {
-    // Try to re-initialize if it was missing
     if (!sql && process.env.DATABASE_URL) {
       dbUrl = process.env.DATABASE_URL;
       sql = neon(dbUrl);
@@ -99,267 +360,12 @@ async function startServer() {
       console.log('Database tables initialized');
     } catch (err) {
       console.error('Error initializing database:', err);
-      // Don't rethrow, let the server start
     }
   }
 
   if (process.env.DATABASE_URL) {
-    initDb(); // Run in background to not block server start
+    initDb();
   }
-
-  // --- API ROUTES ---
-
-  // Health check
-  app.get('/api/health', async (req, res) => {
-    const currentDbUrl = process.env.DATABASE_URL;
-    
-    if (!currentDbUrl) {
-      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada. Adicione-a em Settings > Secrets.' });
-    }
-
-    // Update sql client if env var changed or was missing
-    if (!sql || currentDbUrl !== dbUrl) {
-      dbUrl = currentDbUrl;
-      sql = neon(dbUrl);
-    }
-
-    try {
-      await sql`SELECT 1`;
-      res.json({ status: 'connected' });
-    } catch (err) {
-      console.error('Health check failed:', err);
-      res.status(500).json({ status: 'error', message: (err as Error).message });
-    }
-  });
-
-  // Clients
-  app.get('/api/clients', async (req, res) => {
-    try {
-      const result = await sql`SELECT * FROM clients`;
-      // Map snake_case to camelCase
-      const clients = result.map(c => ({
-        id: c.id,
-        fullName: c.full_name,
-        cep: c.cep,
-        street: c.street,
-        number: c.number,
-        complement: c.complement,
-        neighborhood: c.neighborhood,
-        city: c.city,
-        state: c.state,
-        phone: c.phone,
-        email: c.email,
-        cpf: c.cpf,
-        observation: c.observation
-      }));
-      res.json(clients);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.post('/api/clients', async (req, res) => {
-    const c = req.body;
-    try {
-      await sql`
-        INSERT INTO clients (id, full_name, cep, street, number, complement, neighborhood, city, state, phone, email, cpf, observation)
-        VALUES (${c.id}, ${c.fullName}, ${c.cep}, ${c.street}, ${c.number}, ${c.complement}, ${c.neighborhood}, ${c.city}, ${c.state}, ${c.phone}, ${c.email}, ${c.cpf}, ${c.observation})
-      `;
-      res.status(201).json(c);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.put('/api/clients/:id', async (req, res) => {
-    const { id } = req.params;
-    const c = req.body;
-    try {
-      await sql`
-        UPDATE clients SET 
-          full_name = ${c.fullName}, cep = ${c.cep}, street = ${c.street}, number = ${c.number}, 
-          complement = ${c.complement}, neighborhood = ${c.neighborhood}, city = ${c.city}, 
-          state = ${c.state}, phone = ${c.phone}, email = ${c.email}, cpf = ${c.cpf}, 
-          observation = ${c.observation}
-        WHERE id = ${id}
-      `;
-      res.json(c);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.delete('/api/clients/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-      await sql`DELETE FROM clients WHERE id = ${id}`;
-      res.status(204).send();
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  // Stock Items
-  app.get('/api/stock', async (req, res) => {
-    try {
-      const result = await sql`SELECT * FROM stock_items`;
-      res.json(result);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.post('/api/stock', async (req, res) => {
-    const item = req.body;
-    try {
-      await sql`
-        INSERT INTO stock_items (id, name, size, code, quantity)
-        VALUES (${item.id}, ${item.name}, ${item.size}, ${item.code}, ${item.quantity})
-      `;
-      res.status(201).json(item);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.patch('/api/stock/:id', async (req, res) => {
-    const { id } = req.params;
-    const { quantity } = req.body;
-    try {
-      await sql`UPDATE stock_items SET quantity = ${quantity} WHERE id = ${id}`;
-      res.json({ id, quantity });
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.delete('/api/stock/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-      await sql`DELETE FROM stock_items WHERE id = ${id}`;
-      res.status(204).send();
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  // Sales
-  app.get('/api/sales', async (req, res) => {
-    try {
-      const result = await sql`SELECT * FROM sales`;
-      const sales = result.map(s => ({
-        id: s.id,
-        clientId: s.client_id,
-        saleDate: s.sale_date,
-        productCode: s.product_code,
-        productName: s.product_name,
-        stockItemId: s.stock_item_id,
-        quantity: parseFloat(s.quantity),
-        unitPrice: parseFloat(s.unit_price),
-        total: parseFloat(s.total),
-        observation: s.observation
-      }));
-      res.json(sales);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.post('/api/sales', async (req, res) => {
-    const s = req.body;
-    try {
-      await sql`
-        INSERT INTO sales (id, client_id, sale_date, product_code, product_name, stock_item_id, quantity, unit_price, total, observation)
-        VALUES (${s.id}, ${s.clientId}, ${s.saleDate}, ${s.productCode}, ${s.productName}, ${s.stockItemId}, ${s.quantity}, ${s.unitPrice}, ${s.total}, ${s.observation})
-      `;
-      res.status(201).json(s);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.put('/api/sales/:id', async (req, res) => {
-    const { id } = req.params;
-    const s = req.body;
-    try {
-      await sql`
-        UPDATE sales SET 
-          client_id = ${s.clientId}, sale_date = ${s.saleDate}, product_code = ${s.productCode}, 
-          product_name = ${s.productName}, stock_item_id = ${s.stockItemId}, quantity = ${s.quantity}, 
-          unit_price = ${s.unitPrice}, total = ${s.total}, observation = ${s.observation}
-        WHERE id = ${id}
-      `;
-      res.json(s);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.delete('/api/sales/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-      await sql`DELETE FROM sales WHERE id = ${id}`;
-      res.status(204).send();
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  // Payments
-  app.get('/api/payments', async (req, res) => {
-    try {
-      const result = await sql`SELECT * FROM payments`;
-      const payments = result.map(p => ({
-        id: p.id,
-        clientId: p.client_id,
-        paymentDate: p.payment_date,
-        amount: parseFloat(p.amount),
-        observation: p.observation
-      }));
-      res.json(payments);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.post('/api/payments', async (req, res) => {
-    const p = req.body;
-    try {
-      await sql`
-        INSERT INTO payments (id, client_id, payment_date, amount, observation)
-        VALUES (${p.id}, ${p.clientId}, ${p.paymentDate}, ${p.amount}, ${p.observation})
-      `;
-      res.status(201).json(p);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.put('/api/payments/:id', async (req, res) => {
-    const { id } = req.params;
-    const p = req.body;
-    try {
-      await sql`
-        UPDATE payments SET 
-          client_id = ${p.clientId}, payment_date = ${p.paymentDate}, 
-          amount = ${p.amount}, observation = ${p.observation}
-        WHERE id = ${id}
-      `;
-      res.json(p);
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
-
-  app.delete('/api/payments/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-      await sql`DELETE FROM payments WHERE id = ${id}`;
-      res.status(204).send();
-    } catch (err) {
-      res.status(500).json({ error: (err as Error).message });
-    }
-  });
 
   // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== 'production') {
