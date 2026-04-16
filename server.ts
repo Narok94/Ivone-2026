@@ -21,7 +21,7 @@ async function startServer() {
   // Request logging
   app.use((req, res, next) => {
     if (req.url.startsWith('/api')) {
-      console.log(`${req.method} ${req.url}`);
+      console.log(`[API Request] ${req.method} ${req.url}`);
     }
     next();
   });
@@ -49,6 +49,7 @@ async function startServer() {
 
   // Health check
   apiRouter.get('/health', async (req, res) => {
+    console.log('[API] Health check requested');
     const currentDbUrl = process.env.DATABASE_URL;
     
     if (!currentDbUrl) {
@@ -64,10 +65,12 @@ async function startServer() {
       await sql`SELECT 1`;
       res.json({ status: 'connected' });
     } catch (err) {
-      console.error('Health check failed:', err);
+      console.error('[API] Health check failed:', err);
       res.status(500).json({ status: 'error', message: (err as Error).message });
     }
   });
+
+  app.use('/api', apiRouter);
 
   // Clients
   apiRouter.get('/clients', async (req, res) => {
@@ -296,8 +299,6 @@ async function startServer() {
       res.status(500).json({ error: (err as Error).message });
     }
   });
-
-  app.use('/api', apiRouter);
 
   // --- DATABASE INITIALIZATION ---
   async function initDb() {
