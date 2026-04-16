@@ -43,13 +43,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const checkDbStatus = useCallback(async () => {
     try {
       const res = await fetch('/api/health');
-      const data = await res.json();
-      if (res.ok && data.status === 'connected') {
-        setDbStatus('connected');
-        setDbErrorMessage(null);
-      } else {
+      const text = await res.text();
+      
+      try {
+        const data = JSON.parse(text);
+        if (res.ok && data.status === 'connected') {
+          setDbStatus('connected');
+          setDbErrorMessage(null);
+        } else {
+          setDbStatus('error');
+          setDbErrorMessage(data.message || 'Erro desconhecido ao conectar ao banco.');
+        }
+      } catch (parseError) {
+        console.error('Failed to parse JSON response from /api/health. Response was:', text.substring(0, 200));
         setDbStatus('error');
-        setDbErrorMessage(data.message || 'Erro desconhecido ao conectar ao banco.');
+        setDbErrorMessage('Resposta inválida do servidor. Verifique o console.');
       }
     } catch (error) {
       console.error('Fetch error in checkDbStatus:', error);

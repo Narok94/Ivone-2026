@@ -29,26 +29,8 @@ async function startServer() {
   let dbUrl = process.env.DATABASE_URL;
   let sql = dbUrl ? neon(dbUrl) : null;
 
-  // --- API ROUTES ---
-  const apiRouter = express.Router();
-
-  // Middleware to check DB connection for all /api routes except health
-  apiRouter.use((req, res, next) => {
-    if (req.path === '/health' || req.path === '/health/') return next();
-    
-    if (!sql && process.env.DATABASE_URL) {
-      dbUrl = process.env.DATABASE_URL;
-      sql = neon(dbUrl);
-    }
-
-    if (!sql) {
-      return res.status(500).json({ error: 'Banco de dados não configurado.' });
-    }
-    next();
-  });
-
-  // Health check
-  apiRouter.get('/health', async (req, res) => {
+  // Health check - TOP PRIORITY
+  app.get('/api/health', async (req, res) => {
     console.log('[API] Health check requested');
     const currentDbUrl = process.env.DATABASE_URL;
     
@@ -69,6 +51,26 @@ async function startServer() {
       res.status(500).json({ status: 'error', message: (err as Error).message });
     }
   });
+
+  // --- API ROUTES ---
+  const apiRouter = express.Router();
+
+  // Middleware to check DB connection for all /api routes except health
+  apiRouter.use((req, res, next) => {
+    if (req.path === '/health' || req.path === '/health/') return next();
+    
+    if (!sql && process.env.DATABASE_URL) {
+      dbUrl = process.env.DATABASE_URL;
+      sql = neon(dbUrl);
+    }
+
+    if (!sql) {
+      return res.status(500).json({ error: 'Banco de dados não configurado.' });
+    }
+    next();
+  });
+
+  // Health check
 
   app.use('/api', apiRouter);
 
