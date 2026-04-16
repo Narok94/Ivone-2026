@@ -42,7 +42,20 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const checkDbStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/health');
+      let url = `${window.location.origin}/api/health`;
+      console.log('Checking DB status at:', url);
+      let res = await fetch(url, { cache: 'no-store' });
+      
+      // Fallback to /health if /api/health returns HTML or 404
+      if (!res.ok || res.headers.get('content-type')?.includes('text/html')) {
+        console.warn('/api/health failed or returned HTML, trying /health...');
+        url = `${window.location.origin}/health`;
+        res = await fetch(url, { cache: 'no-store' });
+      }
+
+      const backendHeader = res.headers.get('X-Backend-Server');
+      console.log('Backend Server Header:', backendHeader);
+      
       const text = await res.text();
       
       try {

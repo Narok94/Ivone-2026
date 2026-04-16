@@ -20,9 +20,7 @@ async function startServer() {
 
   // Request logging
   app.use((req, res, next) => {
-    if (req.url.startsWith('/api')) {
-      console.log(`[API] ${req.method} ${req.url}`);
-    }
+    console.log(`[DEBUG] ${req.method} ${req.url}`);
     next();
   });
 
@@ -30,7 +28,12 @@ async function startServer() {
   let sql = dbUrl ? neon(dbUrl) : null;
 
   // 1. Health check - Highest priority
-  app.get('/api/health', async (req, res) => {
+  app.get(['/api/health', '/health'], async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('X-Backend-Server', 'Express-Ivone');
+    
     if (!dbUrl) {
       return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada nos Secrets.' });
     }
@@ -52,15 +55,6 @@ async function startServer() {
       return res.status(500).json({ error: 'Banco de dados não configurado.' });
     }
     next();
-  });
-
-  // Health check
-
-  app.use('/api', apiRouter);
-
-  // 3. API 404 - Ensure any /api request not handled above returns JSON
-  app.all('/api/*all', (req, res) => {
-    res.status(404).json({ error: `Rota de API não encontrada: ${req.method} ${req.url}` });
   });
 
   // Clients
@@ -289,6 +283,14 @@ async function startServer() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
+  });
+
+  // Mount API Router
+  app.use('/api', apiRouter);
+
+  // 3. API 404 - Ensure any /api request not handled above returns JSON
+  app.all('/api/*all', (req, res) => {
+    res.status(404).json({ error: `Rota de API não encontrada: ${req.method} ${req.url}` });
   });
 
   // --- DATABASE INITIALIZATION ---
