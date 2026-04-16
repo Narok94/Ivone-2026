@@ -58,6 +58,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       const text = await res.text();
       
+      if (text.trim().startsWith('<!DOCTYPE html>')) {
+        console.error('Received HTML instead of JSON. Server might be misconfigured or serving SPA fallback.');
+        setDbStatus('error');
+        setDbErrorMessage('Erro de configuração do servidor (recebeu HTML)');
+        return;
+      }
+
       try {
         const data = JSON.parse(text);
         if (res.ok && data.status === 'connected') {
@@ -68,7 +75,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setDbErrorMessage(data.message || 'Erro desconhecido ao conectar ao banco.');
         }
       } catch (parseError) {
-        console.error('Failed to parse JSON response from /api/health. Response was:', text.substring(0, 200));
+        console.error('Failed to parse JSON response. Raw response:', text.substring(0, 500));
         setDbStatus('error');
         setDbErrorMessage('Resposta inválida do servidor. Verifique o console.');
       }

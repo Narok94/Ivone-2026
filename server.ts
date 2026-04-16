@@ -18,25 +18,27 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Request logging
-  app.use((req, res, next) => {
-    console.log(`[DEBUG] ${req.method} ${req.url}`);
-    next();
-  });
-
   let dbUrl = process.env.DATABASE_URL;
   let sql = dbUrl ? neon(dbUrl) : null;
 
-  // 1. Health check - Highest priority
+  // 1. Health check - ABSOLUTE FIRST PRIORITY
   app.get(['/api/health', '/health'], async (req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('X-Backend-Server', 'Express-Ivone');
     
-    if (!dbUrl) {
+    const currentDbUrl = process.env.DATABASE_URL;
+    if (!currentDbUrl) {
       return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada nos Secrets.' });
     }
+
+    // Re-initialize if URL changed
+    if (!sql || currentDbUrl !== dbUrl) {
+      dbUrl = currentDbUrl;
+      sql = neon(dbUrl);
+    }
+
     try {
       await sql!`SELECT 1`;
       return res.json({ status: 'connected' });
@@ -46,11 +48,23 @@ async function startServer() {
     }
   });
 
+  // Request logging
+  app.use((req, res, next) => {
+    console.log(`[DEBUG] ${req.method} ${req.url}`);
+    next();
+  });
+
   // 2. API Router
   const apiRouter = express.Router();
 
   // Middleware for API router
   apiRouter.use((req, res, next) => {
+    const currentDbUrl = process.env.DATABASE_URL;
+    if (!sql && currentDbUrl) {
+      dbUrl = currentDbUrl;
+      sql = neon(dbUrl);
+    }
+
     if (!sql) {
       return res.status(500).json({ error: 'Banco de dados não configurado.' });
     }
@@ -295,8 +309,9 @@ async function startServer() {
 
   // --- DATABASE INITIALIZATION ---
   async function initDb() {
-    if (!sql && process.env.DATABASE_URL) {
-      dbUrl = process.env.DATABASE_URL;
+    const currentDbUrl = process.env.DATABASE_URL;
+    if (!sql && currentDbUrl) {
+      dbUrl = currentDbUrl;
       sql = neon(dbUrl);
     }
     if (!sql) return;
@@ -357,9 +372,7 @@ async function startServer() {
     }
   }
 
-  if (process.env.DATABASE_URL) {
-    initDb();
-  }
+  initDb();
 
   // --- VITE MIDDLEWARE ---
   if (process.env.NODE_ENV !== 'production') {
