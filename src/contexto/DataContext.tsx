@@ -52,6 +52,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setDbErrorMessage(data.message || 'Erro desconhecido ao conectar ao banco.');
       }
     } catch (error) {
+      console.error('Fetch error in checkDbStatus:', error);
       setDbStatus('error');
       setDbErrorMessage('Não foi possível alcançar o servidor.');
     }
