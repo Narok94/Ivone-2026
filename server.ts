@@ -18,12 +18,19 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  const dbUrl = process.env.DATABASE_URL;
-  const sql = dbUrl ? neon(dbUrl) : null;
+  let dbUrl = process.env.DATABASE_URL;
+  let sql = dbUrl ? neon(dbUrl) : null;
 
   // Middleware to check DB connection for all /api routes except health
   app.use('/api', (req, res, next) => {
     if (req.path === '/health') return next();
+    
+    // Try to re-initialize if it was missing
+    if (!sql && process.env.DATABASE_URL) {
+      dbUrl = process.env.DATABASE_URL;
+      sql = neon(dbUrl);
+    }
+
     if (!sql) {
       return res.status(500).json({ error: 'Banco de dados não configurado. Verifique a variável DATABASE_URL nas configurações do projeto.' });
     }
@@ -32,7 +39,13 @@ async function startServer() {
 
   // --- DATABASE INITIALIZATION ---
   async function initDb() {
+    // Try to re-initialize if it was missing
+    if (!sql && process.env.DATABASE_URL) {
+      dbUrl = process.env.DATABASE_URL;
+      sql = neon(dbUrl);
+    }
     if (!sql) return;
+
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS clients (
@@ -90,7 +103,7 @@ async function startServer() {
     }
   }
 
-  if (dbUrl) {
+  if (process.env.DATABASE_URL) {
     initDb(); // Run in background to not block server start
   }
 
@@ -98,16 +111,23 @@ async function startServer() {
 
   // Health check
   app.get('/api/health', async (req, res) => {
-    if (!dbUrl) {
-      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada no Vercel/Settings.' });
+    const currentDbUrl = process.env.DATABASE_URL;
+    
+    if (!currentDbUrl) {
+      return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada. Adicione-a em Settings > Secrets.' });
     }
-    if (!sql) {
-      return res.status(500).json({ status: 'error', message: 'Falha ao inicializar cliente Neon.' });
+
+    // Update sql client if env var changed or was missing
+    if (!sql || currentDbUrl !== dbUrl) {
+      dbUrl = currentDbUrl;
+      sql = neon(dbUrl);
     }
+
     try {
       await sql`SELECT 1`;
       res.json({ status: 'connected' });
     } catch (err) {
+      console.error('Health check failed:', err);
       res.status(500).json({ status: 'error', message: (err as Error).message });
     }
   });
