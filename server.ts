@@ -21,7 +21,7 @@ async function startServer() {
   // Request logging
   app.use((req, res, next) => {
     if (req.url.startsWith('/api')) {
-      console.log(`[API Request] ${req.method} ${req.url}`);
+      console.log(`[API] ${req.method} ${req.url}`);
     }
     next();
   });
@@ -29,41 +29,25 @@ async function startServer() {
   let dbUrl = process.env.DATABASE_URL;
   let sql = dbUrl ? neon(dbUrl) : null;
 
-  // Health check - TOP PRIORITY
-  app.get(['/api/health', '/health'], async (req, res) => {
-    console.log(`[DEBUG] Health check requested via ${req.url}`);
-    const currentDbUrl = process.env.DATABASE_URL;
-    
-    if (!currentDbUrl) {
+  // 1. Health check - Highest priority
+  app.get('/api/health', async (req, res) => {
+    if (!dbUrl) {
       return res.status(500).json({ status: 'error', message: 'DATABASE_URL não configurada nos Secrets.' });
     }
-
-    if (!sql || currentDbUrl !== dbUrl) {
-      dbUrl = currentDbUrl;
-      sql = neon(dbUrl);
-    }
-
     try {
-      await sql`SELECT 1`;
-      res.json({ status: 'connected' });
+      await sql!`SELECT 1`;
+      return res.json({ status: 'connected' });
     } catch (err) {
-      console.error('[DEBUG] Health check failed:', err);
-      res.status(500).json({ status: 'error', message: (err as Error).message });
+      console.error('[API] Health check failed:', err);
+      return res.status(500).json({ status: 'error', message: (err as Error).message });
     }
   });
 
-  // --- API ROUTES ---
+  // 2. API Router
   const apiRouter = express.Router();
 
-  // Middleware to check DB connection for all /api routes except health
+  // Middleware for API router
   apiRouter.use((req, res, next) => {
-    if (req.path === '/health' || req.path === '/health/') return next();
-    
-    if (!sql && process.env.DATABASE_URL) {
-      dbUrl = process.env.DATABASE_URL;
-      sql = neon(dbUrl);
-    }
-
     if (!sql) {
       return res.status(500).json({ error: 'Banco de dados não configurado.' });
     }
@@ -74,8 +58,8 @@ async function startServer() {
 
   app.use('/api', apiRouter);
 
-  // Catch-all for /api to prevent falling through to HTML
-  app.all('/api/*', (req, res) => {
+  // 3. API 404 - Ensure any /api request not handled above returns JSON
+  app.all('/api/*all', (req, res) => {
     res.status(404).json({ error: `Rota de API não encontrada: ${req.method} ${req.url}` });
   });
 
@@ -384,7 +368,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: false })); // Disable automatic index.html serving
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
