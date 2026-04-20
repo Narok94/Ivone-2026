@@ -1,6 +1,8 @@
 {
   "name": "Ivone 2026",
-  "description": "",
-  "requestFramePermissions": [],
+  "description": "Sistema ultra simples para anotar encomendas de revista e ver quem falta pagar.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
   "majorCapabilities": []
 }

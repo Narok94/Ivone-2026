@@ -3,8 +3,7 @@ import { useData } from '../../contexto/DataContext';
 import { Card, Button, Input } from '../common';
 import { TrashIcon, UsersIcon } from '../ui/Icons';
 import { EmptyState } from '../ui/EmptyState';
-
-type View = 'dashboard' | 'clients' | 'add_client' | 'add_sale' | 'stock' | 'add_payment' | 'reports' | 'history' | 'pending_payments' | 'sales_view' | 'all_payments' | 'client_detail' | 'manage_users' | 'user_summary';
+import { View } from '../../types';
 
 export const ManageClients: FC<{ setActiveView: (view: View) => void; onViewClient: (clientId: string) => void; showToast: (msg: string) => void; }> = ({ setActiveView, onViewClient, showToast }) => {
     const { clients, deleteClient, clientBalances } = useData();

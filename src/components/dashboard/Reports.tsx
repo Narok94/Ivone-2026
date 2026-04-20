@@ -44,7 +44,7 @@ export const Reports: FC = () => {
             {sales.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <Card>
-                        <h2 className="text-xl font-bold text-rose-800 mb-4">Top 5 Clientes (por valor de compra) 🏆</h2>
+                        <h2 className="text-xl font-bold text-rose-800 mb-4">Top 5 Clientes (quem mais compra) 🏆</h2>
                         <ul className="space-y-3">
                             {topClients.map(({ client, total }, index) => (
                                 <li key={client?.id || index} className="flex justify-between items-center p-3 bg-rose-50 rounded-xl border border-rose-100">
@@ -55,7 +55,7 @@ export const Reports: FC = () => {
                         </ul>
                     </Card>
                     <Card>
-                        <h2 className="text-xl font-bold text-rose-800 mb-4">Top 5 Produtos (por quantidade vendida) ⭐</h2>
+                        <h2 className="text-xl font-bold text-rose-800 mb-4">Top 5 Produtos (os favoritos) ⭐</h2>
                          <ul className="space-y-3">
                             {topProducts.map(({ productName, quantity }, index) => (
                                 <li key={productName} className="flex justify-between items-center p-3 bg-rose-50 rounded-xl border border-rose-100">
@@ -68,7 +68,7 @@ export const Reports: FC = () => {
                 </div>
             ) : (
                 <Card>
-                    <EmptyState icon={BarChartIcon} title="Dados insuficientes para relatórios" message="Realize algumas vendas para que os relatórios possam ser gerados." />
+                    <EmptyState icon={BarChartIcon} title="Dê uma folheada no caderninho" message="Realize algumas encomendas para que os relatórios possam ser gerados." />
                 </Card>
             )}
         </div>

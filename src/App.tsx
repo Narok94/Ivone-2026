@@ -7,7 +7,6 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { ManageClients } from './components/dashboard/ManageClients';
 import { SalesView } from './components/dashboard/SalesView';
 import { AllPayments } from './components/dashboard/AllPayments';
-import { StockManager } from './components/dashboard/StockManager';
 import { PendingPayments } from './components/dashboard/PendingPayments';
 import { ClientDetail } from './components/dashboard/ClientDetail';
 import { Reports } from './components/dashboard/Reports';
@@ -97,7 +96,6 @@ const App: FC = () => {
             {activeView === 'sales_view' && <SalesView onEditSale={handleEditSale} showToast={showToast} />}
             {activeView === 'all_payments' && <AllPayments onEditPayment={handleEditPayment} showToast={showToast} />}
             {activeView === 'pending_payments' && <PendingPayments onViewClient={handleViewClient} />}
-            {activeView === 'stock' && <StockManager />}
             {activeView === 'reports' && <Reports />}
             {activeView === 'history' && <History />}
         </IvoneLayout>

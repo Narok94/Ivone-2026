@@ -11,7 +11,7 @@ import {
 import { HeaderSummary } from './HeaderSummary';
 import { Toast } from '../ui';
 import { View } from '../../types';
-import { DBStatusIndicator } from './DBStatusIndicator';
+import { AIAssistant } from '../ai/AIAssistant';
 
 interface IvoneLayoutProps {
     children: React.ReactNode;
@@ -25,14 +25,12 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
     const mobileNavItems = [
         { id: 'dashboard', icon: HomeIcon, label: 'Início' },
         { id: 'clients', icon: UsersIcon, label: 'Clientes' },
-        { id: 'sales_view', icon: ShoppingCartIcon, label: 'Vendas' },
+        { id: 'sales_view', icon: ShoppingCartIcon, label: 'Encomendas' },
         { id: 'all_payments', icon: CreditCardIcon, label: 'Pagos' },
-        { id: 'stock', icon: ArchiveIcon, label: 'Estoque' },
     ];
 
     return (
         <div className="min-h-screen bg-[#fdf2f5] flex flex-col pb-20 md:pb-0">
-            <DBStatusIndicator />
             {/* Top Bar */}
             <header className="p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
                 <div className="flex-1 flex justify-center md:justify-start">
@@ -72,6 +70,9 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
 
             {/* Toast Notifications */}
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+
+            {/* AI Assistant Orb */}
+            <AIAssistant onNavigate={setActiveView} showToast={setToast} />
         </div>
     );
 };

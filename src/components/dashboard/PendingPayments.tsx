@@ -15,7 +15,7 @@ export const PendingPayments: FC<{onViewClient: (clientId: string) => void;}> = 
 
     return (
         <Card>
-            <h1 className="text-2xl font-bold text-rose-800 mb-6">Clientes com Pagamentos Pendentes ⏰</h1>
+            <h1 className="text-2xl font-bold text-rose-800 mb-6 font-black italic">Quem falta pagar ⏰</h1>
              {pendingClients.length > 0 ? (
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">

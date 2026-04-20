@@ -131,7 +131,7 @@ export const History: FC = () => {
     return (
         <Card>
             <div className="flex justify-between items-center mb-6 flex-wrap gap-2">
-                <h1 className="text-2xl font-bold text-rose-800">Histórico de Transações 📜</h1>
+                <h1 className="text-2xl font-bold text-rose-800">Seu Caderninho 📜</h1>
                 <div className="flex items-center gap-2">
                    {filteredDate && <Button variant="secondary" onClick={() => setFilteredDate(null)}>Limpar Filtro</Button>}
                    <Button onClick={() => setIsCalendarOpen(true)}>Filtrar por data</Button>
@@ -174,7 +174,7 @@ export const History: FC = () => {
                                                 </div>
                                                 <div className="flex-grow">
                                                     <p className="font-semibold text-gray-800">{tx.productName}</p>
-                                                    <p className="text-sm text-gray-500">Venda para {client?.fullName || 'Cliente Removido'}</p>
+                                                    <p className="text-sm text-gray-500">Encomenda para {client?.fullName || 'Cliente Removido'}</p>
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="font-bold text-rose-600">-{tx.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
@@ -208,7 +208,7 @@ export const History: FC = () => {
                   </ul>
                 </div>
             ) : (
-                <EmptyState icon={HistoryIcon} title={filteredDate ? "Nenhuma transação nesta data" : "Nenhuma transação"} message={filteredDate ? "Tente limpar o filtro ou escolher outra data." : "Todas as suas vendas e pagamentos aparecerão aqui."} />
+                <EmptyState icon={HistoryIcon} title={filteredDate ? "Nenhuma anotação nesta data" : "Nenhuma anotação"} message={filteredDate ? "Tente limpar o filtro ou escolher outra data." : "Todas as suas encomendas e pagamentos aparecerão aqui."} />
             )}
         </Card>
     );

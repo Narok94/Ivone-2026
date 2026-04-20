@@ -1,7 +1,0 @@
-{
-  "name": "Sistema de vendas Ivone",
-  "description": "Um aplicativo para gerenciar vendas, clientes, estoque e pagamentos para revendedoras de Boticário, Natura e Lingerie OuseUse. Simples, moderno e com um toque feminino.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
-}

@@ -4,7 +4,7 @@ import { Card, Button, Input, TextArea } from '../common';
 import { Sale } from '../../types';
 
 export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sale, isEditing: boolean) => void; prefilledClientId: string | null; }> = ({ editingSale, onSaleSuccess, prefilledClientId }) => {
-    const { clients, stockItems, addSale, updateSale } = useData();
+    const { clients, addSale, updateSale } = useData();
     const isEditing = !!editingSale;
     const clientSelectRef = useRef<HTMLDivElement>(null);
 
@@ -13,7 +13,6 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         saleDate: new Date().toISOString().split('T')[0],
         productCode: '',
         productName: '',
-        stockItemId: null as string | null,
         quantity: '1',
         unitPrice: '0',
         observation: '',
@@ -38,7 +37,6 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                 saleDate: editingSale.saleDate,
                 productCode: editingSale.productCode,
                 productName: editingSale.productName,
-                stockItemId: editingSale.stockItemId,
                 quantity: String(editingSale.quantity),
                 unitPrice: String(editingSale.unitPrice),
                 observation: editingSale.observation,
@@ -66,22 +64,6 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         setClientSearch('');
         setClientError('');
     };
-
-
-    useEffect(() => {
-        if (saleData.productCode) {
-            const item = stockItems.find(i => i.code.toLowerCase() === saleData.productCode.toLowerCase());
-            if (item) {
-                setSaleData(prev => ({
-                    ...prev,
-                    productName: item.name,
-                    stockItemId: item.id
-                }));
-            } else {
-                setSaleData(prev => ({ ...prev, stockItemId: null }));
-            }
-        }
-    }, [saleData.productCode, stockItems]);
     
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -93,7 +75,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         setClientError('');
 
         if (!saleData.clientId) {
-            setClientError('É obrigatório selecionar um cliente para registrar a venda.');
+            setClientError('É obrigatório selecionar um cliente para registrar a encomenda.');
             return;
         }
 
@@ -101,7 +83,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         const unitPrice = parseFloat(saleData.unitPrice) || 0;
 
         if (quantity <= 0) {
-            alert('A quantidade da venda deve ser maior que zero.');
+            alert('A quantidade da encomenda deve ser maior que zero.');
             return;
         }
 
@@ -120,7 +102,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                 onSaleSuccess(newSale, false);
             }
         } catch (error: any) {
-            alert(`Erro ao salvar venda: ${error.message}`);
+            alert(`Erro ao salvar encomenda: ${error.message}`);
         }
     };
 
@@ -128,11 +110,11 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
 
     return (
         <Card>
-            <h1 className="text-2xl font-bold text-rose-800 mb-6">{isEditing ? 'Editar Venda' : 'Cadastrar Venda'} 🛍️</h1>
+            <h1 className="text-2xl font-bold text-rose-800 mb-6 italic">{isEditing ? 'Editar Venda' : 'Registrar uma Nova Venda'} 🛍️</h1>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div ref={clientSelectRef}>
-                        <label htmlFor="client-select-button" className="block text-sm font-medium text-gray-700 mb-1">Selecionar Cliente *</label>
+                        <label htmlFor="client-select-button" className="block text-sm font-medium text-gray-700 mb-1">Quem encomendou? *</label>
                         <div className="relative">
                             <button
                                 type="button"
@@ -178,11 +160,11 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                         {clientError && <p className="text-red-500 text-sm mt-1">{clientError}</p>}
                     </div>
                     <div className="self-end">
-                      <Input label="Data da Venda" name="saleDate" type="date" value={saleData.saleDate} onChange={handleChange} />
+                      <Input label="Data do Pedido" name="saleDate" type="date" value={saleData.saleDate} onChange={handleChange} />
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Código do Produto (opcional)" name="productCode" type="number" placeholder="Puxa do estoque" value={saleData.productCode} onChange={handleChange} />
+                    <Input label="Código do Produto (se tiver)" name="productCode" type="number" placeholder="Ex: 12345" value={saleData.productCode} onChange={handleChange} />
                     <Input label="Nome do Produto" name="productName" value={saleData.productName} onChange={handleChange} required/>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -206,7 +188,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                 </div>
                 <TextArea label="Observação" name="observation" value={saleData.observation} onChange={handleChange} />
                 <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={!saleData.clientId}>{isEditing ? 'Atualizar Venda' : 'Registrar Venda'}</Button>
+                    <Button type="submit" disabled={!saleData.clientId}>{isEditing ? 'Atualizar Encomenda' : 'Colocar no Caderninho'}</Button>
                 </div>
             </form>
         </Card>

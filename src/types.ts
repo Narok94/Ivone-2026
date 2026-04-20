@@ -14,21 +14,12 @@ export interface Client {
   observation: string;
 }
 
-export interface StockItem {
-  id: string;
-  name: string;
-  size: string;
-  code: string;
-  quantity: number;
-}
-
 export interface Sale {
   id: string;
   clientId: string;
   saleDate: string; 
   productCode: string;
   productName: string;
-  stockItemId: string | null;
   quantity: number;
   unitPrice: number;
   total: number;
@@ -48,7 +39,6 @@ export type View =
   | 'clients' 
   | 'add_client' 
   | 'add_sale' 
-  | 'stock' 
   | 'add_payment' 
   | 'reports' 
   | 'history' 

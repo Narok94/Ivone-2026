@@ -1,8 +1,7 @@
 import React, { FC, useMemo } from 'react';
 import { useData } from '../../contexto/DataContext';
+import { View } from '../../types';
 import { UsersIcon, TrendingUpIcon, WalletIcon, ClockIcon } from '../ui/Icons';
-
-type View = 'dashboard' | 'clients' | 'add_client' | 'add_sale' | 'stock' | 'add_payment' | 'reports' | 'history' | 'pending_payments' | 'sales_view' | 'all_payments' | 'client_detail' | 'manage_users' | 'user_summary';
 
 interface HeaderSummaryProps {
     setActiveView: (view: View) => void;
@@ -17,9 +16,9 @@ export const HeaderSummary: FC<HeaderSummaryProps> = ({ setActiveView }) => {
 
     const summaryItems = [
         { title: 'Clientes', value: clients.length, icon: UsersIcon, view: 'clients', color: 'from-[#c084fc] to-[#e879f9]' },
-        { title: 'Vendas', value: totalSalesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: TrendingUpIcon, view: 'sales_view', color: 'from-[#f472b6] to-[#fb7185]' },
+        { title: 'Encomendas', value: totalSalesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: TrendingUpIcon, view: 'sales_view', color: 'from-[#f472b6] to-[#fb7185]' },
         { title: 'Recebidos', value: totalReceived.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: WalletIcon, view: 'all_payments', color: 'from-[#34d399] to-[#10b981]' },
-        { title: 'Pendente', value: totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: ClockIcon, view: 'pending_payments', color: 'from-[#fbbf24] to-[#f59e0b]' },
+        { title: 'Falta Pagar', value: totalPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: ClockIcon, view: 'pending_payments', color: 'from-[#fbbf24] to-[#f59e0b]' },
     ];
 
     return (

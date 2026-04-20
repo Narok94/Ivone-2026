@@ -72,9 +72,9 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
 
     const handleDelete = async (e: React.MouseEvent, saleId: string) => {
         e.stopPropagation();
-        if (window.confirm('Tem certeza que deseja excluir esta venda? O estoque será ajustado.')) {
+        if (window.confirm('Tem certeza que deseja excluir esta encomenda?')) {
             await deleteSale(saleId);
-            showToast('Venda excluída com sucesso!');
+            showToast('Encomenda excluída com sucesso!');
         }
     };
 
@@ -92,7 +92,7 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
                         Voltar para Clientes
                     </Button>
                 </div>
-                <h1 className="text-2xl font-bold text-rose-800 mb-4">Extrato de Vendas: {selectedClient.fullName}</h1>
+                <h1 className="text-2xl font-bold text-rose-800 mb-4">Caderninho de Encomendas: {selectedClient.fullName}</h1>
                 <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
                     {clientSales.length > 0 ? groupedSales.map(([month, salesInMonth]) => (
                         <div key={month}>
@@ -127,7 +127,7 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
                             </div>
                         </div>
                     )) : (
-                        <EmptyState icon={ShoppingCartIcon} title="Nenhuma venda encontrada" message={`${selectedClient.fullName} ainda não tem nenhuma compra registrada.`} />
+                        <EmptyState icon={ShoppingCartIcon} title="Nenhuma encomenda encontrada" message={`${selectedClient.fullName} ainda não tem nenhum pedido na revista.`} />
                     )}
                 </div>
             </Card>
@@ -137,7 +137,7 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
     return (
         <Card>
             <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-                <h1 className="text-2xl font-bold text-rose-800">Vendas por Cliente 🛒</h1>
+                <h1 className="text-2xl font-bold text-rose-800">Encomendas por Cliente 🛒</h1>
             </div>
              <Input
                 label="Buscar cliente..."

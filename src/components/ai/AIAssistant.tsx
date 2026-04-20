@@ -71,10 +71,10 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
             }
             const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const response = await ai.models.generateContent({
-                model: "gemini-1.5-flash",
+                model: "gemini-3.1-flash-tts-preview",
                 contents: [{ role: 'user', parts: [{ text }] }],
                 config: {
-                    responseModalities: ["audio"],
+                    responseModalities: ["AUDIO"],
                     speechConfig: {
                         voiceConfig: {
                           prebuiltVoiceConfig: { voiceName: 'Kore' },
@@ -104,10 +104,10 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const response = await ai.models.generateContent({
-                model: "gemini-1.5-flash",
+                model: "gemini-3.1-flash-tts-preview",
                 contents: [{ role: 'user', parts: [{ text }] }],
                 config: {
-                    responseModalities: ["audio"],
+                    responseModalities: ["AUDIO"],
                     speechConfig: {
                         voiceConfig: {
                           prebuiltVoiceConfig: { voiceName: 'Kore' },
@@ -152,19 +152,40 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
         const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
         const clientNames = clients.map(c => c.fullName).join(', ') || 'Nenhum';
         
-        const assistantName = 'Rebeca';
-        const emojis = '💖✨🎉';
-        const userGreetingName = 'Ivone';
-        const systemInstruction = `Você é '${assistantName}', um assistente virtual SUPER extrovertido, divertido e simpático para o app 'Sistema de Vendas'. Seu objetivo é ajudar o usuário, ${userGreetingName}, a cadastrar clientes, vendas e pagamentos de uma forma leve e descontraída. Clientes existentes: ${clientNames}. Ações disponíveis: 1. 'add_client': Campos obrigatórios: fullName, address, phone, cpf. Campos opcionais: email, observation. 2. 'add_sale': Campos obrigatórios: clientName (deve ser um dos clientes existentes da lista), productName, quantity, unitPrice. Campos opcionais: observation. 3. 'add_payment': Campos obrigatórios: clientName (deve ser um dos clientes existentes da lista), amount. Campos opcionais: observation. 4. 'navigate': Campo obrigatório: view (pode ser 'dashboard', 'clients', 'sales_view', 'all_payments', 'stock', 'reports', 'history'). COMO PROCEDER: Use uma linguagem bem humorada, muitos emojis ${emojis} e seja super proativo! Peça UMA informação de cada vez, como se estivesse batendo um papo. Quando tiver TODOS os campos obrigatórios para uma ação, responda APENAS com um JSON no seguinte formato: {"action": "action_name", "data": { ...dados... }}. NÃO adicione nenhum texto antes ou depois do JSON, seja direto ao ponto nessa hora! Se o usuário pedir para cancelar, diga algo como "Sem problemas! Missão abortada. 🚀 O que vamos fazer agora?". Se o usuário conversar sobre qualquer outra coisa, entre na brincadeira e responda de forma divertida antes de voltar ao foco. Ao cumprimentar, sempre use o nome do usuário (${userGreetingName}) e se apresente com entusiasmo!`;
+        const systemInstruction = `Você é a "Assistente Ivone", o cérebro do app Ivone-2026. Sua função é ajudar uma revendedora de cosméticos (Natura, Boticário) a organizar suas vendas e cobranças de forma ultra simples.
+
+DIRETRIZES DE ESTILO:
+- Use uma linguagem acolhedora, simples e sem termos técnicos (nada de "database", "input", "interface" ou "software").
+- Chame as ações de "anotações no caderninho".
+- Use emojis para ser amigável (🌸, 📖, 💰, ✨, ✅).
+
+1. FLUXO DE VENDAS:
+Como ela não trabalha com estoque fixo, o foco é registrar o que o cliente escolheu na revista para ela poder pedir depois.
+- Se o usuário disser algo como "A vizinha comprou um perfume Essencial da Natura de 180 reais e já me deu 50", você deve responder de forma carinhosa confirmando os valores.
+
+2. REGRAS DE OURO:
+- Se ela perguntar "Quem me deve?", liste os nomes e os valores de forma direta, ex: "A Maria ainda falta pagar R$ 40,00 do batom".
+- O foco é: Comprou -> Entregou -> Recebeu.
+- Se faltar o nome da cliente ou o valor, pergunte com doçura.
+
+SAÍDA ESTRUTURADA (INTERNA):
+Extraia dados de vendas e pagamentos. Clientes existentes: ${clientNames}.
+Quando tiver dados suficientes para uma ação, responda APENAS com o JSON correspondente.
+Para Vendas: {"comando": "REGISTRAR_PEDIDO", "dados": { "cliente": "Nome", "item": "Nome do Produto", "total": 180.0, "entrada": 50.0 }}
+Para Clientes: {"comando": "SALVAR_CLIENTE", "dados": { "nome": "Nome", "telefone": "...", "endereco": "..." }}
+Para Pagamentos: {"comando": "SALVAR_PAGAMENTO", "dados": { "cliente": "Nome", "valor": 50.0 }}
+Para Navegação: {"comando": "NAVEGAR", "dados": { "destino": "dashboard" | "clients" | "sales_view" | "pending_payments" | "reports" | "history" }}
+
+IMPORTANTE: Não adicione texto antes ou depois do JSON se estiver executando um comando. Se estiver apenas conversando, seja a melhor amiga da Ivone.`;
 
         chatRef.current = ai.chats.create({ 
-            model: 'gemini-1.5-flash',
+            model: 'gemini-3-flash-preview',
             config: {
-                systemInstruction
+                systemInstruction: systemInstruction
             }
         });
 
-        const initialMessage = `Oii, Ivone! 💖 Aqui é a Rebeca, sua assistente pessoal, pronta para deixar tudo organizado! Vamos começar? Me conta, vamos cadastrar uma cliente super especial, lançar uma venda incrível ou registrar um pagamento? Tô prontíssima! ✨`;
+        const initialMessage = `Olá, Ivone! 🌸 Sou sua assistente e estou pronta para te ajudar com as encomendas da revista e a ver quem falta pagar. O que você quer anotar no caderninho hoje? 📖✨`;
 
         setMessages([{ sender: 'ai', text: initialMessage }]);
         preloadGreetingAudio(initialMessage);
@@ -181,7 +202,10 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
             recognition.onstart = () => setIsListening(true);
             recognition.onend = () => setIsListening(false);
             recognition.onerror = (event: any) => {
-                console.error('Speech recognition error', event.error);
+                console.error('Speech recognition error:', event.error || event);
+                if (event.error === 'not-allowed') {
+                    showToast("Permissão de microfone negada.");
+                }
                 setIsListening(false);
             };
             recognition.onresult = (event: any) => {
@@ -193,45 +217,74 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
         }
     }, []);
 
-    const handleAction = (action: string, data: any) => {
+    const handleAction = (comando: string, dados: any) => {
         let successMessage = '';
         try {
-            switch (action) {
-                case 'add_client':
-                    addClient(data);
-                    successMessage = `Cliente ${data.fullName} cadastrado com sucesso! ✅`;
-                    break;
-                case 'add_sale': {
-                    const client = clients.find(c => c.fullName.toLowerCase() === data.clientName.toLowerCase());
-                    if (!client) throw new Error(`Cliente ${data.clientName} não encontrada.`);
+            switch (comando) {
+                case 'REGISTRAR_PEDIDO':
+                case 'SALVAR_VENDA': {
+                    const clientName = dados.cliente || dados.nome;
+                    const client = clients.find(c => c.fullName.toLowerCase() === clientName.toLowerCase());
+                    if (!client) throw new Error(`Cliente ${clientName} não encontrada.`);
+                    
+                    const totalValue = parseFloat(dados.total || dados.valor);
+                    const entryValue = parseFloat(dados.entrada || dados.pago || 0);
+                    const remaining = totalValue - entryValue;
+
                     addSale({
                         clientId: client.id,
                         saleDate: new Date().toISOString().split('T')[0],
                         productCode: '',
-                        productName: data.productName,
-                        stockItemId: null,
-                        quantity: parseFloat(data.quantity),
-                        unitPrice: parseFloat(data.unitPrice),
-                        observation: data.observation || '',
+                        productName: dados.item || dados.produto,
+                        quantity: 1,
+                        unitPrice: totalValue,
+                        observation: `Encomenda via caderninho. Entrada: R$ ${entryValue}. Falta: R$ ${remaining}.`,
                     });
-                    successMessage = `Venda para ${client.fullName} registrada com sucesso! 🛒`;
+
+                    if (entryValue > 0) {
+                        addPayment({
+                            clientId: client.id,
+                            paymentDate: new Date().toISOString().split('T')[0],
+                            amount: entryValue,
+                            observation: `Entrada para: ${dados.item || dados.produto}`,
+                        });
+                    }
+
+                    successMessage = `Anotado, Ivone! 📖 Já coloquei no caderninho que a ${client.fullName} quer o ${dados.item || dados.produto}. Ela te deu R$ ${entryValue.toFixed(2)} e o restante (R$ ${remaining.toFixed(2)}) ficou para quando você entregar o produto. ✅`;
                     break;
                 }
-                case 'add_payment': {
-                    const client = clients.find(c => c.fullName.toLowerCase() === data.clientName.toLowerCase());
-                    if (!client) throw new Error(`Cliente ${data.clientName} não encontrada.`);
+                case 'SALVAR_CLIENTE':
+                    addClient({
+                        fullName: dados.nome,
+                        cep: '',
+                        street: dados.endereco || '',
+                        number: '',
+                        complement: '',
+                        neighborhood: '',
+                        city: '',
+                        state: '',
+                        phone: dados.telefone || '',
+                        email: '',
+                        cpf: dados.cpf || '',
+                        observation: '',
+                    });
+                    successMessage = `Tudo bem, Ivone! Já coloquei o nome da ${dados.nome} no seu caderninho de clientes. 🌸`;
+                    break;
+                case 'SALVAR_PAGAMENTO': {
+                    const client = clients.find(c => c.fullName.toLowerCase() === dados.cliente.toLowerCase());
+                    if (!client) throw new Error(`Cliente ${dados.cliente} não encontrada.`);
                     addPayment({
                         clientId: client.id,
                         paymentDate: new Date().toISOString().split('T')[0],
-                        amount: parseFloat(data.amount),
-                        observation: data.observation || '',
+                        amount: parseFloat(dados.valor),
+                        observation: 'Pagamento registrado via assistente',
                     });
-                     successMessage = `Pagamento de ${client.fullName} registrado com sucesso! 💸`;
+                     successMessage = `Prontinho, Ivone! Registrei o pagamento de R$ ${dados.valor} da ${client.fullName}. 💸`;
                     break;
                 }
-                case 'navigate':
-                    onNavigate(data.view);
-                    successMessage = `Indo para ${data.view}... 🚀`;
+                case 'NAVEGAR':
+                    onNavigate(dados.destino);
+                    successMessage = `Indo para ${dados.destino}... 🚀`;
                     break;
                 default:
                     throw new Error('Ação desconhecida.');
@@ -240,7 +293,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
             setMessages(prev => [...prev, { sender: 'ai', text: successMessage }]);
 
         } catch (error: any) {
-            const errorMessage = `Desculpe, ocorreu um erro: ${error.message} 😥`;
+            const errorMessage = `Ivone, deu um probleminha: ${error.message} 😥`;
             setMessages(prev => [...prev, { sender: 'ai', text: errorMessage }]);
         }
     };
@@ -262,7 +315,10 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
             if (responseText.startsWith('{') && responseText.endsWith('}')) {
                 try {
                     const jsonResponse = JSON.parse(responseText);
-                    if (jsonResponse.action && jsonResponse.data) {
+                    if (jsonResponse.comando && jsonResponse.dados) {
+                        handleAction(jsonResponse.comando, jsonResponse.dados);
+                    } else if (jsonResponse.action && jsonResponse.data) {
+                        // Legacy support if model gets confused
                         handleAction(jsonResponse.action, jsonResponse.data);
                     }
                 } catch (e) {
@@ -370,8 +426,12 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
         };
     }, [isDragging]);
 
-    const handleOrbClick = () => {
+    const handleOrbClick = async () => {
         if (wasDraggedRef.current) return;
+
+        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+            await audioCtxRef.current.resume();
+        }
 
         const playGreeting = () => {
             const greetingMessage = messages.find(m => m.sender === 'ai');
@@ -422,8 +482,8 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
                                     <BotMessageSquareIcon className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg">Rebeca ✨</h3>
-                                    <p className="text-xs text-pink-100">Sua assistente pessoal</p>
+                                    <h3 className="font-bold text-lg italic">Assistente Ivone ✨</h3>
+                                    <p className="text-xs text-pink-100">Seu caderninho inteligente</p>
                                 </div>
                             </div>
                             <button onClick={() => setIsOpen(false)} className="text-2xl hover:rotate-90 transition-transform">&times;</button>
@@ -461,7 +521,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
                                 type="text" 
                                 value={userInput}
                                 onChange={e => setUserInput(e.target.value)}
-                                placeholder="Fale com a Rebeca..."
+                                placeholder="Converse com sua assistente... 🌸"
                                 className="flex-1 bg-gray-100 border-none rounded-full px-5 py-3 focus:ring-2 focus:ring-pink-500 transition-all outline-none"
                             />
                             <button 
