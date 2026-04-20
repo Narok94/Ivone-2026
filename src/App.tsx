@@ -25,6 +25,7 @@ import { Sale, Payment, View } from './types';
 
 const App: FC = () => {
     const [activeView, setActiveView] = useState<View>('dashboard');
+    const [viewStack, setViewStack] = useState<View[]>([]);
     const [toast, setToast] = useState<string | null>(null);
     
     // State for editing/pre-filling
@@ -37,35 +38,58 @@ const App: FC = () => {
         setTimeout(() => setToast(null), 3000);
     };
 
+    const navigate = (view: View, pushToStack = true) => {
+        if (pushToStack && activeView !== view) {
+            setViewStack(prev => [...prev, activeView]);
+        }
+        setActiveView(view);
+    };
+
+    const handleBack = () => {
+        if (viewStack.length > 0) {
+            const previousView = viewStack[viewStack.length - 1];
+            setViewStack(prev => prev.slice(0, -1));
+            setActiveView(previousView);
+        } else {
+            setActiveView('dashboard');
+        }
+    };
+
     const handleNavigate = (view: View, clientId?: string) => {
         if (clientId) setSelectedClientId(clientId);
-        setActiveView(view);
+        navigate(view);
     };
 
     const handleViewClient = (clientId: string) => {
         setSelectedClientId(clientId);
-        setActiveView('client_detail');
+        navigate('client_detail');
     };
 
     const handleEditSale = (sale: Sale) => {
         setEditingSale(sale);
-        setActiveView('add_sale');
+        navigate('add_sale');
     };
 
     const handleEditPayment = (payment: Payment) => {
         setEditingPayment(payment);
-        setActiveView('add_payment');
+        navigate('add_payment');
     };
 
     // Standard User View Logic
     return (
-        <IvoneLayout activeView={activeView} setActiveView={(v) => setActiveView(v as View)} toast={toast} setToast={setToast}>
+        <IvoneLayout 
+            activeView={activeView} 
+            setActiveView={(v) => navigate(v as View)} 
+            onBack={handleBack}
+            toast={toast} 
+            setToast={setToast}
+        >
             {activeView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-            {activeView === 'clients' && <ManageClients setActiveView={(v) => setActiveView(v as View)} onViewClient={handleViewClient} showToast={showToast} />}
+            {activeView === 'clients' && <ManageClients setActiveView={(v) => navigate(v as View)} onViewClient={handleViewClient} showToast={showToast} />}
             {activeView === 'add_client' && (
                 <div className="max-w-2xl mx-auto">
                     <h1 className="text-2xl font-bold text-rose-800 mb-6">Cadastrar Novo Cliente 👤</h1>
-                    <ClientForm onDone={() => setActiveView('clients')} />
+                    <ClientForm onDone={() => navigate('clients')} />
                 </div>
             )}
             {activeView === 'client_detail' && selectedClientId && (
@@ -77,7 +101,7 @@ const App: FC = () => {
                     prefilledClientId={selectedClientId}
                     onSaleSuccess={() => {
                         setEditingSale(null);
-                        setActiveView('sales_view');
+                        navigate('sales_view');
                         showToast(editingSale ? 'Venda atualizada!' : 'Venda registrada!');
                     }} 
                 />
@@ -88,7 +112,7 @@ const App: FC = () => {
                     prefilledClientId={selectedClientId}
                     onPaymentSuccess={() => {
                         setEditingPayment(null);
-                        setActiveView('all_payments');
+                        navigate('all_payments');
                         showToast(editingPayment ? 'Pagamento atualizado!' : 'Pagamento recebido!');
                     }}
                 />

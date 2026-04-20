@@ -6,7 +6,8 @@ import {
     CreditCardIcon, 
     ArchiveIcon, 
     SettingsIcon, 
-    LogOutIcon
+    LogOutIcon,
+    ArrowLeftIcon
 } from '../ui';
 import { HeaderSummary } from './HeaderSummary';
 import { Toast } from '../ui';
@@ -17,11 +18,12 @@ interface IvoneLayoutProps {
     children: React.ReactNode;
     activeView: View;
     setActiveView: (view: View) => void;
+    onBack: () => void;
     toast: string | null;
     setToast: (msg: string | null) => void;
 }
 
-export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, toast, setToast }) => {
+export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, onBack, toast, setToast }) => {
     const mobileNavItems = [
         { id: 'dashboard', icon: HomeIcon, label: 'Início' },
         { id: 'clients', icon: UsersIcon, label: 'Clientes' },
@@ -38,6 +40,16 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                         Olá, Ivone! ❤️ ✨
                     </h1>
                 </div>
+                
+                {activeView !== 'dashboard' && (
+                    <button 
+                        onClick={onBack}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-pink-100 text-pink-600 rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold text-sm"
+                    >
+                        <ArrowLeftIcon className="w-4 h-4" />
+                        <span>Voltar</span>
+                    </button>
+                )}
             </header>
 
             {/* Header Summary - Only show on dashboard */}

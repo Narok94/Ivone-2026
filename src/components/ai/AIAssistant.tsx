@@ -52,6 +52,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
     const audioCtxRef = useRef<AudioContext | null>(null);
     const lastPlayedMessageRef = useRef<ReactNode | null>(null);
     const [initialGreetingAudio, setInitialGreetingAudio] = useState<AudioBuffer | null>(null);
+    const [ttsDisabled, setTtsDisabled] = useState(false);
 
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
@@ -62,7 +63,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
     }, []);
 
     const textToSpeechAndPlay = async (text: string) => {
-        if (!GEMINI_API_KEY || !audioCtxRef.current || !text) return;
+        if (!GEMINI_API_KEY || !audioCtxRef.current || !text || ttsDisabled) return;
         
         setIsLoading(true);
         try {
@@ -77,7 +78,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
                     responseModalities: ["AUDIO"],
                     speechConfig: {
                         voiceConfig: {
-                          prebuiltVoiceConfig: { voiceName: 'Kore' },
+                            prebuiltVoiceConfig: { voiceName: 'Kore' },
                         },
                     },
                 },
@@ -91,16 +92,20 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
                 source.connect(audioCtxRef.current.destination);
                 source.start();
             }
-        } catch (error) {
-            console.error("TTS Error:", error);
-            showToast("Desculpe, tive um problema com minha voz.");
+        } catch (error: any) {
+            if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+                setTtsDisabled(true);
+            } else {
+                console.error("TTS Error:", error);
+                showToast("Desculpe, tive um problema com minha voz.");
+            }
         } finally {
             setIsLoading(false);
         }
     };
     
     const preloadGreetingAudio = async (text: string) => {
-        if (!GEMINI_API_KEY || !audioCtxRef.current || !text) return;
+        if (!GEMINI_API_KEY || !audioCtxRef.current || !text || ttsDisabled) return;
         try {
             const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
             const response = await ai.models.generateContent({
@@ -110,7 +115,7 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
                     responseModalities: ["AUDIO"],
                     speechConfig: {
                         voiceConfig: {
-                          prebuiltVoiceConfig: { voiceName: 'Kore' },
+                            prebuiltVoiceConfig: { voiceName: 'Kore' },
                         },
                     },
                 },
@@ -121,8 +126,12 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
                 const audioBuffer = await decodeAudioData(audioData, audioCtxRef.current, 24000, 1);
                 setInitialGreetingAudio(audioBuffer);
             }
-        } catch (error) {
-            console.error("TTS Preload Error:", error);
+        } catch (error: any) {
+            if (error.message?.includes('429') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+                setTtsDisabled(true);
+            } else {
+                console.error("TTS Preload Error:", error);
+            }
         }
     };
     
@@ -143,6 +152,12 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
             textToSpeechAndPlay(lastMessage.text);
         }
     }, [messages, isOpen]);
+
+    useEffect(() => {
+        const initialGreeting = `Olá, Ivone! 🌸 Sou sua assistente e estou pronta para te ajudar com as encomendas da revista e a ver quem falta pagar. O que você quer anotar no caderninho hoje? 📖✨`;
+        setMessages([{ sender: 'ai', text: initialGreeting }]);
+        preloadGreetingAudio(initialGreeting);
+    }, []);
 
     useEffect(() => {
         if (!GEMINI_API_KEY) {
@@ -184,11 +199,6 @@ IMPORTANTE: Não adicione texto antes ou depois do JSON se estiver executando um
                 systemInstruction: systemInstruction
             }
         });
-
-        const initialMessage = `Olá, Ivone! 🌸 Sou sua assistente e estou pronta para te ajudar com as encomendas da revista e a ver quem falta pagar. O que você quer anotar no caderninho hoje? 📖✨`;
-
-        setMessages([{ sender: 'ai', text: initialMessage }]);
-        preloadGreetingAudio(initialMessage);
     }, [clients]);
 
      useEffect(() => {
