@@ -22,20 +22,20 @@ export const HeaderSummary: FC<HeaderSummaryProps> = ({ setActiveView }) => {
     ];
 
     return (
-        <div className="p-2 md:p-4">
-             <div className="flex flex-wrap justify-center gap-2 md:gap-4 max-w-7xl mx-auto">
+        <div className="p-3 md:p-4">
+             <div className="grid grid-cols-2 md:flex md:flex-wrap justify-center gap-3 md:gap-4 max-w-7xl mx-auto">
                  {summaryItems.map(item => (
                     <div 
                         key={item.title} 
                         onClick={() => setActiveView(item.view as View)} 
-                        className={`p-3 md:p-4 flex items-center bg-gradient-to-r ${item.color} rounded-xl md:rounded-2xl shadow-md md:shadow-lg text-white cursor-pointer hover:shadow-xl transform hover:scale-105 transition-all duration-300 min-w-[140px] md:min-w-[240px] flex-1 max-w-[180px] md:max-w-[300px]`}
+                        className={`p-3 md:p-4 flex items-center bg-gradient-to-r ${item.color} rounded-2xl shadow-sm md:shadow-lg text-white cursor-pointer hover:shadow-xl transform hover:scale-[1.02] active:scale-95 transition-all duration-300 md:min-w-[240px] md:flex-1 md:max-w-[300px]`}
                     >
-                        <div className="p-2 md:p-3 rounded-full mr-2 md:mr-4 bg-white/20">
+                        <div className="p-2 md:p-3 rounded-xl mr-2 md:mr-4 bg-white/20 backdrop-blur-sm">
                             <item.icon className="w-4 h-4 md:w-6 md:h-6 text-white" />
                         </div>
-                        <div>
-                            <p className="text-[10px] md:text-xs font-bold opacity-90 uppercase tracking-wider">{item.title}</p>
-                            <p className="text-xs md:text-lg font-black truncate">{item.value}</p>
+                        <div className="overflow-hidden">
+                            <p className="text-[10px] font-bold opacity-90 uppercase tracking-widest leading-none mb-1">{item.title}</p>
+                            <p className="text-sm md:text-lg font-black truncate">{item.value}</p>
                         </div>
                     </div>
                  ))}

@@ -34,19 +34,19 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
     return (
         <div className="min-h-screen bg-[#fdf2f5] flex flex-col pb-20 md:pb-0">
             {/* Top Bar */}
-            <header className="p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
-                <div className="flex-1 flex justify-center md:justify-start">
-                    <h1 className="text-xl md:text-2xl font-black text-[#e91e63] flex items-center gap-2">
-                        Olá, Ivone! ❤️ ✨
+            <header className="p-3 md:p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
+                <div className="flex-1 flex justify-start">
+                    <h1 className="text-lg md:text-2xl font-black text-[#e91e63] flex items-center gap-2">
+                        Olá, Ivone! ❤️
                     </h1>
                 </div>
                 
                 {activeView !== 'dashboard' && (
                     <button 
                         onClick={onBack}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-pink-100 text-pink-600 rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold text-sm"
+                        className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-white border border-pink-100 text-pink-600 rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold text-xs md:text-sm"
                     >
-                        <ArrowLeftIcon className="w-4 h-4" />
+                        <ArrowLeftIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
                         <span>Voltar</span>
                     </button>
                 )}

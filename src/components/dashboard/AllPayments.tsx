@@ -77,25 +77,44 @@ export const AllPayments: FC<{ onEditPayment: (payment: Payment) => void; showTo
         <Card>
             <h1 className="text-2xl font-bold text-rose-800 mb-6">Recebimentos por Cliente 💰</h1>
              {clientsWithPayments.length > 0 ? (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-pink-100/70 text-pink-800 font-semibold uppercase text-sm">
-                            <tr>
-                                <th className="p-3 rounded-l-2xl">Cliente</th>
-                                <th className="p-3 text-right rounded-r-2xl">Total Pago</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {clientsWithPayments.map(client => (
-                                <tr key={client.id} onClick={() => setSelectedClient(client)} className="border-b border-pink-100/50 hover:bg-pink-50/50 cursor-pointer">
-                                    <td className="p-3 font-medium">{client.fullName}</td>
-                                    <td className="p-3 text-right font-bold text-emerald-600">
-                                        {(clientPaymentTotals.get(client.id) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                    </td>
+                <div className="space-y-4">
+                    {/* Desktop View Table */}
+                    <div className="hidden md:block overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-pink-100/70 text-pink-800 font-semibold uppercase text-sm">
+                                <tr>
+                                    <th className="p-3 rounded-l-2xl">Cliente</th>
+                                    <th className="p-3 text-right rounded-r-2xl">Total Pago</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {clientsWithPayments.map(client => (
+                                    <tr key={client.id} onClick={() => setSelectedClient(client)} className="border-b border-pink-100/50 hover:bg-pink-50/50 cursor-pointer">
+                                        <td className="p-3 font-medium">{client.fullName}</td>
+                                        <td className="p-3 text-right font-bold text-emerald-600">
+                                            {(clientPaymentTotals.get(client.id) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile View Cards */}
+                    <div className="md:hidden space-y-2">
+                        {clientsWithPayments.map(client => (
+                            <div 
+                                key={client.id} 
+                                onClick={() => setSelectedClient(client)}
+                                className="bg-white border border-pink-100 p-4 rounded-2xl shadow-sm active:scale-[0.98] transition-transform flex items-center justify-between"
+                            >
+                                <span className="font-bold text-[#e91e63]">{client.fullName}</span>
+                                <span className="text-sm font-black text-emerald-600 font-mono">
+                                    {(clientPaymentTotals.get(client.id) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             ) : (
                  <EmptyState icon={WalletIcon} title="Nenhum pagamento recebido" message="Quando um pagamento for registrado, os clientes aparecerão aqui com o total pago."/>

@@ -41,7 +41,10 @@ export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (mes
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [position, setPosition] = useState({ x: window.innerWidth - 80, y: window.innerHeight - 80 });
+    const [position, setPosition] = useState({ 
+        x: window.innerWidth - 80, 
+        y: window.innerHeight - (window.innerWidth < 768 ? 160 : 80) 
+    });
     const [isDragging, setIsDragging] = useState(false);
     const wasDraggedRef = useRef(false);
     const dragStartPos = useRef({ x: 0, y: 0 });
@@ -484,25 +487,25 @@ IMPORTANTE: Não adicione texto antes ou depois do JSON se estiver executando um
             </div>
 
             {isOpen && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
-                    <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[80vh] animate-scale-up">
-                        <header className="bg-gradient-to-r from-pink-500 to-rose-500 p-6 text-white flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
-                                    <BotMessageSquareIcon className="w-6 h-6" />
+                <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/20 backdrop-blur-sm animate-fade-in">
+                    <div className="w-full max-w-lg bg-white rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden flex flex-col h-[90vh] md:h-[80vh] animate-scale-up">
+                        <header className="bg-gradient-to-r from-pink-500 to-rose-500 p-4 md:p-6 text-white flex items-center justify-between">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-md">
+                                    <BotMessageSquareIcon className="w-5 h-5 md:w-6 md:h-6" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg italic">Assistente Ivone ✨</h3>
-                                    <p className="text-xs text-pink-100">Seu caderninho inteligente</p>
+                                    <h3 className="font-bold text-base md:text-lg italic">Assistente Ivone ✨</h3>
+                                    <p className="text-[10px] md:text-xs text-pink-100 uppercase tracking-tighter">Seu caderninho inteligente</p>
                                 </div>
                             </div>
-                            <button onClick={() => setIsOpen(false)} className="text-2xl hover:rotate-90 transition-transform">&times;</button>
+                            <button onClick={() => setIsOpen(false)} className="p-2 text-2xl hover:rotate-90 transition-transform">&times;</button>
                         </header>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-pink-50/30">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-pink-50/10">
                             {messages.map((msg, idx) => (
                                 <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} animate-slide-in`}>
-                                    <div className={`max-w-[85%] p-4 rounded-2xl shadow-sm ${msg.sender === 'user' ? 'bg-pink-500 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-pink-100'}`}>
+                                    <div className={`max-w-[85%] p-3 md:p-4 rounded-2xl shadow-sm ${msg.sender === 'user' ? 'bg-pink-500 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-pink-100'}`}>
                                         {msg.text}
                                     </div>
                                 </div>
