@@ -4,13 +4,18 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-let connectionString = process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL || '';
+let rawConnectionString = process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL || '';
+
+// Bypass pooler for direct connection and ensure schema=public
+const cleanUrl = rawConnectionString.replace('-pooler', '');
+let connectionString = cleanUrl;
 
 if (connectionString && !connectionString.includes('schema=')) {
   const separator = connectionString.includes('?') ? '&' : '?';
   connectionString += `${separator}schema=public`;
 }
 
+console.log('Banco atual:', cleanUrl.split('/').pop());
 console.log('[DB LOG] Environment Status:');
 console.log(' - IVONE_DATABASE_URL:', process.env.IVONE_DATABASE_URL ? 'DEFINED' : 'MISSING');
 console.log(' - DATABASE_URL:', process.env.DATABASE_URL ? 'DEFINED' : 'MISSING');
@@ -58,7 +63,7 @@ export const initDb = async () => {
       const tables = [
         {
           name: 'usuarios',
-          sql: `CREATE TABLE IF NOT EXISTS public.usuarios (
+          sql: `CREATE TABLE IF NOT EXISTS usuarios (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             username TEXT UNIQUE,
             pin TEXT NOT NULL
@@ -66,7 +71,7 @@ export const initDb = async () => {
         },
         {
           name: 'clientes',
-          sql: `CREATE TABLE IF NOT EXISTS public.clientes (
+          sql: `CREATE TABLE IF NOT EXISTS clientes (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             full_name TEXT NOT NULL,
             phone TEXT,
@@ -84,9 +89,9 @@ export const initDb = async () => {
         },
         {
           name: 'vendas',
-          sql: `CREATE TABLE IF NOT EXISTS public.vendas (
+          sql: `CREATE TABLE IF NOT EXISTS vendas (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            client_id UUID REFERENCES public.clientes(id) ON DELETE CASCADE,
+            client_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
             sale_date DATE DEFAULT CURRENT_DATE,
             product_name TEXT NOT NULL,
             quantity INTEGER DEFAULT 1,
@@ -98,9 +103,9 @@ export const initDb = async () => {
         },
         {
           name: 'pagamentos',
-          sql: `CREATE TABLE IF NOT EXISTS public.pagamentos (
+          sql: `CREATE TABLE IF NOT EXISTS pagamentos (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            client_id UUID REFERENCES public.clientes(id) ON DELETE CASCADE,
+            client_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
             payment_date DATE DEFAULT CURRENT_DATE,
             amount DECIMAL(10,2) NOT NULL,
             observation TEXT
@@ -110,14 +115,14 @@ export const initDb = async () => {
 
       for (const table of tables) {
         await pool.query(table.sql);
-        console.log(`[DB LOG] Table "public.${table.name}" checked/created.`);
+        console.log(`[DB LOG] Table "${table.name}" checked/created.`);
       }
 
       // 2. Critical Fix: Ensure 'username' exists in 'usuarios' if it was created differently before
       try {
-        await pool.query('ALTER TABLE public.usuarios ADD COLUMN IF NOT EXISTS username TEXT');
-        await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_username ON public.usuarios(username)');
-        console.log('[DB LOG] Column "username" in "public.usuarios" verified.');
+        await pool.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS username TEXT');
+        await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios(username)');
+        console.log('[DB LOG] Column "username" in "usuarios" verified.');
       } catch (e: any) {
         console.warn('[DB LOG] Column verification warning:', e.message);
       }
@@ -125,7 +130,7 @@ export const initDb = async () => {
       // 3. Ensure default user exists
       console.log('[DB LOG] Verifying default user (Ivone)...');
       await pool.query(`
-        INSERT INTO public.usuarios (username, pin) 
+        INSERT INTO usuarios (username, pin) 
         VALUES ('Ivone', '2026') 
         ON CONFLICT (username) DO NOTHING
       `);
