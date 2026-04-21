@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-let rawConnectionString = process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL || '';
+let rawConnectionString = (process.env as any).ivone_DATABASE_URL || process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL || '';
 
 // Bypass pooler for direct connection and ensure schema=public
 const cleanUrl = rawConnectionString.replace('-pooler', '');
@@ -17,6 +17,7 @@ if (connectionString && !connectionString.includes('schema=')) {
 
 console.log('Banco atual:', cleanUrl.split('/').pop());
 console.log('[DB LOG] Environment Status:');
+console.log(' - ivone_DATABASE_URL:', (process.env as any).ivone_DATABASE_URL ? 'DEFINED' : 'MISSING');
 console.log(' - IVONE_DATABASE_URL:', process.env.IVONE_DATABASE_URL ? 'DEFINED' : 'MISSING');
 console.log(' - DATABASE_URL:', process.env.DATABASE_URL ? 'DEFINED' : 'MISSING');
 
@@ -65,6 +66,7 @@ export const initDb = async () => {
           name: 'usuarios',
           sql: `CREATE TABLE IF NOT EXISTS usuarios (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            nome TEXT,
             username TEXT UNIQUE,
             pin TEXT NOT NULL
           )`
@@ -116,6 +118,14 @@ export const initDb = async () => {
       for (const table of tables) {
         await pool.query(table.sql);
         console.log(`[DB LOG] Table "${table.name}" checked/created.`);
+      }
+
+      // Fix: Ensure 'nome' is nullable if it exists (legacy constraint fix)
+      try {
+        await pool.query('ALTER TABLE usuarios ALTER COLUMN nome DROP NOT NULL');
+        console.log('[DB LOG] Column "nome" set to nullable in "usuarios".');
+      } catch (e: any) {
+        // Ignore if column doesn't exist or already nullable
       }
 
       // 2. Critical Fix: Ensure 'username' exists in 'usuarios' if it was created differently before
