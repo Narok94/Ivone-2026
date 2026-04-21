@@ -2,21 +2,23 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import pkg from 'pg';
-const { Pool } = pkg;
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
 dotenv.config();
 
+// Required for @neondatabase/serverless in Node environments
+neonConfig.webSocketConstructor = ws;
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const connectionString = process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL;
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  connectionString: connectionString,
 });
 
 async function startServer() {
@@ -28,11 +30,15 @@ async function startServer() {
 
   // Database Initialization
   const initDb = async () => {
-    if (!process.env.DATABASE_URL) {
-       console.warn("DATABASE_URL not found. Database features will be limited.");
+    if (!connectionString) {
+       console.warn("Nenhuma URL de banco de dados encontrada (IVONE_DATABASE_URL). As funções de persistência não funcionarão.");
        return;
     }
     try {
+      // Test connection
+      await pool.query('SELECT 1');
+      console.log('✅ Conexão com o Neon estabelecida com sucesso!');
+
       await pool.query(`
         CREATE TABLE IF NOT EXISTS usuarios (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -80,7 +86,7 @@ async function startServer() {
         await pool.query("INSERT INTO usuarios (username, pin) VALUES ('Ivone', '2026')");
       }
     } catch (err) {
-      console.error("Error initializing database:", err);
+      console.error("❌ Erro ao conectar ou inicializar o banco de dados:", err);
     }
   };
 
@@ -89,15 +95,44 @@ async function startServer() {
   // API Routes
   app.post('/api/login', async (req, res) => {
     const { username, pin } = req.body;
+    
+    if (!connectionString) {
+      return res.status(503).json({ 
+        success: false, 
+        message: 'Banco de dados não configurado. Verifique as variáveis de ambiente. 🌸',
+        error_type: 'DATABASE_OFFLINE'
+      });
+    }
+
     try {
-      const result = await pool.query('SELECT * FROM usuarios WHERE username = $1 AND pin = $2', [username, pin]);
-      if (result.rows.length > 0) {
-        res.json({ success: true, user: { id: result.rows[0].id, username: result.rows[0].username } });
-      } else {
-        res.status(401).json({ success: false, message: 'PIN incorreto. Tente novamente. 🌸' });
+      const result = await pool.query('SELECT * FROM usuarios WHERE username = $1', [username]);
+      
+      if (result.rows.length === 0) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'Usuário não encontrado. 🌸',
+          error_type: 'INVALID_USER'
+        });
       }
-    } catch (err) {
-      res.status(500).json({ error: 'Erro no servidor' });
+
+      const user = result.rows[0];
+      if (user.pin === pin) {
+        res.json({ success: true, user: { id: user.id, username: user.username } });
+      } else {
+        res.status(401).json({ 
+          success: false, 
+          message: 'PIN incorreto. Tente novamente, Ivone! 🌸',
+          error_type: 'INVALID_PIN'
+        });
+      }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Erro ao conectar com o servidor. O banco de dados pode estar offline. 🌸',
+        error: err.message,
+        error_type: 'SERVER_ERROR'
+      });
     }
   });
 

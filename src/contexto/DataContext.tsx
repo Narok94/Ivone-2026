@@ -86,14 +86,26 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'Ivone', pin })
       });
+      
       const data = await res.json();
-      if (data.success) {
+      
+      if (res.ok && data.success) {
         setUser(data.user);
         return { success: true };
       }
-      return { success: false, message: data.message };
-    } catch (e) {
-      return { success: false, message: 'Erro ao conectar ao servidor. Verifique sua internet.' };
+      
+      // Detailed error handling based on status and response type
+      return { 
+        success: false, 
+        message: data.message || 'Erro ao entrar. Tente novamente mais tarde. 🌸' 
+      };
+      
+    } catch (e: any) {
+      console.error('Login request error:', e);
+      return { 
+        success: false, 
+        message: 'Não foi possível conectar ao servidor. O banco de dados pode estar offline ou houve um erro de rede. 🌸' 
+      };
     }
   };
 
