@@ -104,7 +104,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login request error:', e);
       return { 
         success: false, 
-        message: 'Não foi possível conectar ao servidor. O banco de dados pode estar offline ou houve um erro de rede. 🌸' 
+        message: `Erro de conexão: ${e.message || 'Verifique se o banco de dados está online.'} 🌸` 
       };
     }
   };

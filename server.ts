@@ -24,21 +24,39 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Database Initialization
-  initDb().then(() => {
-    console.log('🚀 Database sync complete.');
-  }).catch(err => {
-    console.error('❌ Database sync FAILED:', err);
+  // Request logging
+  app.use((req, res, next) => {
+    console.log(`[DEV SERVER] ${req.method} ${req.path}`);
+    next();
   });
 
+  // Database Initialization - Wait for it to ensure Ivone exists
+  try {
+    await initDb();
+    console.log('✅ Database sync complete.');
+  } catch (err) {
+    console.error('❌ Database sync FAILED:', err);
+  }
+
   // API Routes - Local Wrapper for Serverless functions
-  app.all('/api/login', (req, res) => loginHandler(req as any, res as any));
-  app.all('/api/clients', (req, res) => clientsHandler(req as any, res as any));
-  app.all('/api/clients/:id', (req, res) => clientsHandler(req as any, res as any));
-  app.all('/api/sales', (req, res) => salesHandler(req as any, res as any));
-  app.all('/api/sales/:id', (req, res) => salesHandler(req as any, res as any));
-  app.all('/api/payments', (req, res) => paymentsHandler(req as any, res as any));
-  app.all('/api/payments/:id', (req, res) => paymentsHandler(req as any, res as any));
+  const wrap = (handler: any) => async (req: any, res: any) => {
+    try {
+      await handler(req, res);
+    } catch (err: any) {
+      console.error(`[WRAPPER ERROR] ${req.path}:`, err);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
+      }
+    }
+  };
+
+  app.all('/api/login', wrap(loginHandler));
+  app.all('/api/clients', wrap(clientsHandler));
+  app.all('/api/clients/:id', wrap(clientsHandler));
+  app.all('/api/sales', wrap(salesHandler));
+  app.all('/api/sales/:id', wrap(salesHandler));
+  app.all('/api/payments', wrap(paymentsHandler));
+  app.all('/api/payments/:id', wrap(paymentsHandler));
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

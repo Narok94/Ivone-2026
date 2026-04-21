@@ -4,104 +4,130 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-console.log('[DB LOG] Checking environment variables...');
-console.log('[DB LOG] IVONE_DATABASE_URL present:', !!process.env.IVONE_DATABASE_URL);
-console.log('[DB LOG] DATABASE_URL present:', !!process.env.DATABASE_URL);
-
 const connectionString = process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL;
 
-if (!connectionString) {
-  console.error('[DB LOG] ❌ No connection string found! Database will not work.');
-} else {
-  console.log('[DB LOG] Connection string start:', connectionString.substring(0, 15) + '...');
-}
+console.log('[DB LOG] Environment Status:');
+console.log(' - IVONE_DATABASE_URL:', process.env.IVONE_DATABASE_URL ? 'DEFINED' : 'MISSING');
+console.log(' - DATABASE_URL:', process.env.DATABASE_URL ? 'DEFINED' : 'MISSING');
 
 // Required for @neondatabase/serverless in Node environments
 if (typeof window === 'undefined') {
-  console.log('[DB LOG] Setting up neonConfig.webSocketConstructor');
-  // Handle ESM/CJS interop for ws
-  const wsConstructor = (ws as any).default || ws;
-  neonConfig.webSocketConstructor = wsConstructor;
+  try {
+    // Enable fetch for potentially better compatibility in some environments
+    neonConfig.useFetch = true;
+    const wsConstructor = (ws as any).default || ws;
+    neonConfig.webSocketConstructor = wsConstructor;
+    console.log('[DB LOG] Neon Config: useFetch=true, WebSocket constructor set.');
+  } catch (e) {
+    console.error('[DB LOG] Error configuring Neon:', e);
+  }
 }
 
+// Wrapper for queries to log them
+const originalPoolQuery = Pool.prototype.query;
+(Pool.prototype as any).query = function(...args: any[]) {
+  const sql = typeof args[0] === 'string' ? args[0].substring(0, 50).replace(/\n/g, ' ') : 'Complex Query';
+  console.log(`[DB QUERY] ${sql}...`);
+  return (originalPoolQuery as any).apply(this, args);
+};
+
+// Create pool lazily
 export const pool = new Pool({
-  connectionString: connectionString,
+  connectionString: connectionString || '',
 });
 
 export const initDb = async () => {
-    if (!connectionString) return;
+    if (!connectionString) {
+      console.error('[DB LOG] ❌ CRITICAL: No connection string found! Database operations will fail.');
+      return;
+    }
     
     try {
+      console.log('[DB LOG] Attempting to connect to Neon...');
       await pool.query('SELECT 1');
-      console.log('[DB LOG] ✅ SELECT 1 Success');
+      console.log('[DB LOG] ✅ Basic connection successful.');
 
-      // Check existing schema for troubleshooting
-      try {
-        const columns = await pool.query(`
-          SELECT column_name 
-          FROM information_schema.columns 
-          WHERE table_name = 'usuarios'
-        `);
-        console.log('[DB LOG] Table "usuarios" columns:', columns.rows.map(r => r.column_name).join(', '));
-      } catch (e) {
-        console.warn('[DB LOG] Could not fetch columns for "usuarios":', e);
+      // 1. Create tables one by one for better error tracking
+      console.log('[DB LOG] Syncing schema...');
+      
+      const tables = [
+        {
+          name: 'usuarios',
+          sql: `CREATE TABLE IF NOT EXISTS usuarios (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            username TEXT UNIQUE,
+            pin TEXT NOT NULL
+          )`
+        },
+        {
+          name: 'clientes',
+          sql: `CREATE TABLE IF NOT EXISTS clientes (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            full_name TEXT NOT NULL,
+            phone TEXT,
+            email TEXT,
+            street TEXT,
+            neighborhood TEXT,
+            city TEXT,
+            state TEXT,
+            cep TEXT,
+            number TEXT,
+            complement TEXT,
+            cpf TEXT,
+            observation TEXT
+          )`
+        },
+        {
+          name: 'vendas',
+          sql: `CREATE TABLE IF NOT EXISTS vendas (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            client_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
+            sale_date DATE DEFAULT CURRENT_DATE,
+            product_name TEXT NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            unit_price DECIMAL(10,2) NOT NULL,
+            total DECIMAL(10,2) NOT NULL,
+            observation TEXT,
+            product_code TEXT
+          )`
+        },
+        {
+          name: 'pagamentos',
+          sql: `CREATE TABLE IF NOT EXISTS pagamentos (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            client_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
+            payment_date DATE DEFAULT CURRENT_DATE,
+            amount DECIMAL(10,2) NOT NULL,
+            observation TEXT
+          )`
+        }
+      ];
+
+      for (const table of tables) {
+        await pool.query(table.sql);
+        console.log(`[DB LOG] Table "${table.name}" checked/created.`);
       }
 
-      await pool.query(`
-        CREATE TABLE IF NOT EXISTS usuarios (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          username TEXT UNIQUE NOT NULL,
-          pin TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS clientes (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          full_name TEXT NOT NULL,
-          phone TEXT,
-          email TEXT,
-          street TEXT,
-          neighborhood TEXT,
-          city TEXT,
-          state TEXT,
-          cep TEXT,
-          number TEXT,
-          complement TEXT,
-          cpf TEXT,
-          observation TEXT
-        );
-        CREATE TABLE IF NOT EXISTS vendas (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          client_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
-          sale_date DATE DEFAULT CURRENT_DATE,
-          product_name TEXT NOT NULL,
-          quantity INTEGER DEFAULT 1,
-          unit_price DECIMAL(10,2) NOT NULL,
-          total DECIMAL(10,2) NOT NULL,
-          observation TEXT,
-          product_code TEXT
-        );
-        CREATE TABLE IF NOT EXISTS pagamentos (
-          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-          client_id UUID REFERENCES clientes(id) ON DELETE CASCADE,
-          payment_date DATE DEFAULT CURRENT_DATE,
-          amount DECIMAL(10,2) NOT NULL,
-          observation TEXT
-        );
-      `);
-
-      // Ensure 'username' column exists (in case table was created manually differently)
+      // 2. Critical Fix: Ensure 'username' exists in 'usuarios' if it was created differently before
       try {
         await pool.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS username TEXT');
-        // If it was added, we might need a unique constraint
         await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios(username)');
-      } catch (e) {
-        console.warn('[DB LOG] Could not alter table usuarios (it might be fine):', e);
+        console.log('[DB LOG] Column "username" in "usuarios" verified.');
+      } catch (e: any) {
+        console.warn('[DB LOG] Column verification warning:', e.message);
       }
+
+      // 3. Ensure default user exists
+      console.log('[DB LOG] Verifying default user (Ivone)...');
+      await pool.query(`
+        INSERT INTO usuarios (username, pin) 
+        VALUES ('Ivone', '2026') 
+        ON CONFLICT (username) DO NOTHING
+      `);
+      console.log('[DB LOG] Default user sync finished.');
       
-      const ivone = await pool.query("SELECT * FROM usuarios WHERE username = 'Ivone'");
-      if (ivone.rows.length === 0) {
-        await pool.query("INSERT INTO usuarios (username, pin) VALUES ('Ivone', '2026')");
-      }
-    } catch (err) {
-      console.error("❌ Erro ao inicializar o banco de dados:", err);
+    } catch (err: any) {
+      console.error("[DB LOG] ❌ Database sync error:", err.message);
+      // Don't throw, let the app run but routes will fail with clear errors
     }
 };

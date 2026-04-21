@@ -21,6 +21,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log(`[HANDLER LOG] Query completed. Rows found: ${result.rows.length}`);
     
     if (result.rows.length === 0) {
+      // Check if ANY users exist
+      const totalUsers = await pool.query('SELECT count(*) as count FROM usuarios');
+      const count = parseInt(totalUsers.rows[0].count);
+      console.log(`[HANDLER LOG] Total users in table: ${count}`);
+      
+      if (count === 0) {
+        return res.status(401).json({ 
+          success: false, 
+          message: 'O banco de dados ainda está sendo configurado. Tente novamente em 2 segundos! 🌸',
+          retry: true
+        });
+      }
+      
       return res.status(401).json({ success: false, message: 'Usuário não encontrado. 🌸' });
     }
 
