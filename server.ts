@@ -25,7 +25,11 @@ async function startServer() {
   app.use(express.json());
 
   // Database Initialization
-  await initDb();
+  initDb().then(() => {
+    console.log('🚀 Database sync complete.');
+  }).catch(err => {
+    console.error('❌ Database sync FAILED:', err);
+  });
 
   // API Routes - Local Wrapper for Serverless functions
   app.all('/api/login', (req, res) => loginHandler(req as any, res as any));
