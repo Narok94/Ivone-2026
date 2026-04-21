@@ -17,6 +17,16 @@ const __dirname = path.dirname(__filename);
 
 const connectionString = process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL;
 
+console.log('--- DATABASE CONFIGURATION ---');
+console.log('IVONE_DATABASE_URL defined:', !!process.env.IVONE_DATABASE_URL);
+console.log('DATABASE_URL defined:', !!process.env.DATABASE_URL);
+if (connectionString) {
+  console.log('Connection string start:', connectionString.substring(0, 15) + '...');
+} else {
+  console.error('CRITICAL: No connection string found!');
+}
+console.log('------------------------------');
+
 const pool = new Pool({
   connectionString: connectionString,
 });
@@ -28,13 +38,20 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
+  // Request logging middleware
+  app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+  });
+
   // Database Initialization
   const initDb = async () => {
     if (!connectionString) {
-       console.warn("Nenhuma URL de banco de dados encontrada (IVONE_DATABASE_URL). As funções de persistência não funcionarão.");
+       console.error("❌ ERRO CRÍTICO: Nenhuma URL de banco de dados encontrada (IVONE_DATABASE_URL).");
        return;
     }
     try {
+      console.log('Iniciando teste de conexão com o banco...');
       // Test connection
       await pool.query('SELECT 1');
       console.log('✅ Conexão com o Neon estabelecida com sucesso!');
@@ -95,8 +112,10 @@ async function startServer() {
   // API Routes
   app.post('/api/login', async (req, res) => {
     const { username, pin } = req.body;
+    console.log(`[LOGIN ATTEMPT] User: ${username}, PIN provided: ${!!pin}`);
     
     if (!connectionString) {
+      console.error('[LOGIN ERROR] No database connection string configured.');
       return res.status(503).json({ 
         success: false, 
         message: 'Banco de dados não configurado. Verifique as variáveis de ambiente. 🌸',
@@ -105,9 +124,12 @@ async function startServer() {
     }
 
     try {
+      console.log(`[LOGIN DB] Querying user: ${username}...`);
       const result = await pool.query('SELECT * FROM usuarios WHERE username = $1', [username]);
+      console.log(`[LOGIN DB] Query completed. Rows found: ${result.rows.length}`);
       
       if (result.rows.length === 0) {
+        console.warn(`[LOGIN WARN] User not found: ${username}`);
         return res.status(401).json({ 
           success: false, 
           message: 'Usuário não encontrado. 🌸',
@@ -116,9 +138,13 @@ async function startServer() {
       }
 
       const user = result.rows[0];
+      console.log(`[LOGIN AUTH] Comparing PIN for user ID: ${user.id}`);
+      
       if (user.pin === pin) {
+        console.log(`[LOGIN SUCCESS] User: ${username}`);
         res.json({ success: true, user: { id: user.id, username: user.username } });
       } else {
+        console.warn(`[LOGIN FAIL] Incorrect PIN for user: ${username}`);
         res.status(401).json({ 
           success: false, 
           message: 'PIN incorreto. Tente novamente, Ivone! 🌸',
@@ -126,11 +152,12 @@ async function startServer() {
         });
       }
     } catch (err: any) {
-      console.error('Login error:', err);
+      console.error('[LOGIN CRITICAL ERROR]:', err);
       res.status(500).json({ 
         success: false, 
         message: 'Erro ao conectar com o servidor. O banco de dados pode estar offline. 🌸',
         error: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
         error_type: 'SERVER_ERROR'
       });
     }
@@ -270,6 +297,19 @@ async function startServer() {
     app.use(express.static(distPath));
     app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
+
+  // Global Error Handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('--- GLOBAL ERROR CAUGHT ---');
+    console.error('Path:', req.path);
+    console.error('Error:', err);
+    console.error('---------------------------');
+    res.status(500).json({
+      success: false,
+      message: 'Ocorreu um erro inesperado no servidor. Ivone, tente recarregar a página! 🌸',
+      error: err.message
+    });
+  });
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://localhost:${PORT}`);
