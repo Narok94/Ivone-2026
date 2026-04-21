@@ -122,12 +122,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const updateClient = useCallback(async (updatedClient: Client) => {
-    // Implement update API if needed, for now just set state and maybe sync later
-    // Realistically should have a PUT endpoint
+    const res = await fetch(`/api/clients?id=${updatedClient.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedClient)
+    });
+    const serverClient = await res.json();
+    setClients(prev => prev.map(c => c.id === serverClient.id ? serverClient : c));
   }, []);
 
   const deleteClient = useCallback(async (clientId: string) => {
-    await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
+    await fetch(`/api/clients?id=${clientId}`, { method: 'DELETE' });
     setClients(prev => prev.filter(c => c.id !== clientId));
   }, []);
   
@@ -146,12 +151,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
   
   const updateSale = useCallback(async (updatedSale: Sale) => {
-    // Implement update API
-    return updatedSale;
+    const total = parseFloat((updatedSale.quantity * updatedSale.unitPrice).toFixed(2));
+    const res = await fetch(`/api/sales?id=${updatedSale.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...updatedSale, total })
+    });
+    const serverSale = await res.json();
+    setSales(prev => prev.map(s => s.id === serverSale.id ? serverSale : s));
+    return serverSale;
   }, []);
 
   const deleteSale = useCallback(async (saleId: string) => {
-    await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
+    await fetch(`/api/sales?id=${saleId}`, { method: 'DELETE' });
     setSales(prev => prev.filter(s => s.id !== saleId));
   }, []);
 
@@ -166,11 +178,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
   
   const updatePayment = useCallback(async (updatedPayment: Payment) => {
-    // Implement update API
+    const res = await fetch(`/api/payments?id=${updatedPayment.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedPayment)
+    });
+    const serverPayment = await res.json();
+    setPayments(prev => prev.map(p => p.id === serverPayment.id ? serverPayment : p));
   }, []);
 
   const deletePayment = useCallback(async (paymentId: string) => {
-    await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
+    await fetch(`/api/payments?id=${paymentId}`, { method: 'DELETE' });
     setPayments(prev => prev.filter(p => p.id !== paymentId));
   }, []);
 

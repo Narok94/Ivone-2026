@@ -22,6 +22,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
     const [clientSearch, setClientSearch] = useState('');
     const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
     const [clientError, setClientError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const filteredClients = useMemo(() => {
         const sortedClients = [...clients].sort((a,b) => a.fullName.localeCompare(b.fullName));
@@ -93,6 +94,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
             unitPrice: unitPrice,
         };
 
+        setIsSubmitting(true);
         try {
             if (isEditing && editingSale) {
                 const updatedSale = await updateSale({ ...salePayload, id: editingSale.id, total: 0 }); // total is recalculated in context
@@ -103,6 +105,8 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
             }
         } catch (error: any) {
             alert(`Erro ao salvar encomenda: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -244,10 +248,17 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                     <div className="pt-6">
                         <Button 
                             type="submit" 
-                            disabled={!saleData.clientId}
+                            disabled={!saleData.clientId || isSubmitting}
                             className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
                         >
-                            {isEditing ? 'Atualizar Venda ✨' : 'Colocar no Caderninho ✨'}
+                            {isSubmitting ? (
+                                <div className="flex items-center justify-center gap-3">
+                                    <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Salvando...</span>
+                                </div>
+                            ) : (
+                                isEditing ? 'Atualizar Venda ✨' : 'Colocar no Caderninho ✨'
+                            )}
                         </Button>
                     </div>
                 </form>

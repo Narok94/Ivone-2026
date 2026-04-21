@@ -156,7 +156,14 @@ export const PaymentForm: FC<{
                             disabled={!paymentData.clientId || isLoading}
                             className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
                         >
-                            {isEditing ? 'Atualizar Recebimento ✨' : 'Confirmar Recebimento ✨'}
+                            {isLoading ? (
+                                <div className="flex items-center justify-center gap-3">
+                                    <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                    <span>Registrando...</span>
+                                </div>
+                            ) : (
+                                isEditing ? 'Atualizar Recebimento ✨' : 'Confirmar Recebimento ✨'
+                            )}
                         </Button>
                     </div>
                 </form>

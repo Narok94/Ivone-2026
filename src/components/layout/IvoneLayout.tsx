@@ -34,43 +34,108 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
     ];
 
     return (
-        <div className="min-h-screen bg-[#fdf2f5] flex flex-col pb-20 md:pb-0">
-            {/* Top Bar */}
-            <header className="p-3 md:p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
-                <div className="flex-1 flex justify-start items-center gap-3">
-                    <h1 className="text-lg md:text-2xl font-black text-[#e91e63] flex items-center gap-2">
-                        Olá, Ivone! ❤️
+        <div className="min-h-screen bg-[#fdf2f5] flex flex-col md:flex-row pb-20 md:pb-0">
+            {/* Desktop Sidebar */}
+            <aside className="hidden md:flex w-64 bg-white border-r border-pink-100 flex-col sticky top-0 h-screen z-30">
+                <div className="p-6">
+                    <h1 className="text-2xl font-black text-[#e91e63] flex items-center gap-2">
+                        Ivone Vendas ❤️
                     </h1>
-                    <button 
-                        onClick={logout}
-                        className="p-2 text-pink-300 hover:text-pink-500 transition-colors"
-                        title="Sair"
-                    >
-                        <LogOutIcon className="w-4 h-4 md:w-5 md:h-5" />
-                    </button>
                 </div>
                 
-                {activeView !== 'dashboard' && (
-                    <button 
-                        onClick={onBack}
-                        className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-white border border-pink-100 text-pink-600 rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold text-xs md:text-sm"
+                <nav className="flex-1 px-4 space-y-2 py-4">
+                    {mobileNavItems.map(item => (
+                        <button
+                            key={item.id}
+                            onClick={() => setActiveView(item.id as View)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
+                                activeView === item.id 
+                                ? 'bg-pink-50 text-[#e91e63]' 
+                                : 'text-gray-500 hover:bg-gray-50 hover:text-pink-400'
+                            }`}
+                        >
+                            <item.icon className="w-5 h-5" />
+                            <span>{item.label}</span>
+                        </button>
+                    ))}
+                    
+                    <button
+                        onClick={() => setActiveView('reports')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
+                            activeView === 'reports' 
+                            ? 'bg-pink-50 text-[#e91e63]' 
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-pink-400'
+                        }`}
                     >
-                        <ArrowLeftIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                        <span>Voltar</span>
+                        <ArchiveIcon className="w-5 h-5" />
+                        <span>Relatórios</span>
                     </button>
-                )}
-            </header>
+                    
+                    <button
+                        onClick={() => setActiveView('history')}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
+                            activeView === 'history' 
+                            ? 'bg-pink-50 text-[#e91e63]' 
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-pink-400'
+                        }`}
+                    >
+                        <SettingsIcon className="w-5 h-5" />
+                        <span>Histórico</span>
+                    </button>
+                </nav>
 
-            {/* Header Summary - Only show on dashboard */}
-            {activeView === 'dashboard' && <HeaderSummary setActiveView={setActiveView} />}
+                <div className="p-4 border-t border-pink-50">
+                    <button 
+                        onClick={logout}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
+                    >
+                        <LogOutIcon className="w-5 h-5" />
+                        <span>Sair</span>
+                    </button>
+                </div>
+            </aside>
 
-            <div className="flex-1 flex flex-col overflow-hidden">
-                {/* Main Content Area */}
-                <main className="flex-1 overflow-y-auto p-4 md:p-8">
-                    <div className="max-w-7xl mx-auto">
-                        {children}
+            <div className="flex-1 flex flex-col min-w-0">
+                {/* Top Bar (Mobile Only / Common Header) */}
+                <header className="p-3 md:p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
+                    <div className="flex-1 flex justify-start items-center gap-3">
+                        <h1 className="text-lg md:text-2xl font-black text-[#e91e63] flex items-center gap-2 md:hidden">
+                            Ivone ❤️
+                        </h1>
+                        <h2 className="hidden md:block text-xl font-bold text-rose-800">
+                            Olá, Ivone! 🌸
+                        </h2>
+                        <button 
+                            onClick={logout}
+                            className="p-2 text-pink-300 hover:text-pink-500 transition-colors md:hidden"
+                            title="Sair"
+                        >
+                            <LogOutIcon className="w-4 h-4 md:w-5 md:h-5" />
+                        </button>
                     </div>
-                </main>
+                    
+                    {activeView !== 'dashboard' && (
+                        <button 
+                            onClick={onBack}
+                            className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-white border border-pink-100 text-pink-600 rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold text-xs md:text-sm"
+                        >
+                            <ArrowLeftIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                            <span>Voltar</span>
+                        </button>
+                    )}
+                </header>
+
+                {/* Header Summary - Only show on dashboard */}
+                {activeView === 'dashboard' && <HeaderSummary setActiveView={setActiveView} />}
+
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* Main Content Area */}
+                    <main className="flex-1 overflow-y-auto p-4 md:p-8">
+                        <div className="max-w-7xl mx-auto">
+                            {children}
+                        </div>
+                    </main>
+                </div>
             </div>
 
             {/* Mobile Bottom Navigation */}

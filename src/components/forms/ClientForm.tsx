@@ -21,6 +21,7 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
     });
     const [isCepLoading, setIsCepLoading] = useState(false);
     const [cepError, setCepError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const capitalizeWords = (str: string): string => {
         if (!str) return '';
@@ -114,12 +115,20 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if(client){
-            await updateClient({ ...client, ...formData });
-        } else {
-            await addClient(formData);
+        setIsSubmitting(true);
+        try {
+            if(client){
+                await updateClient({ ...client, ...formData });
+            } else {
+                await addClient(formData);
+            }
+            onDone();
+        } catch (error) {
+            console.error(error);
+            alert('Ocorreu um erro ao salvar o cliente. 🌸');
+        } finally {
+            setIsSubmitting(false);
         }
-        onDone();
     };
 
     return (
@@ -169,7 +178,16 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
             <Input label="CPF" id="cpf" name="cpf" value={formData.cpf} onChange={handleChange} />
             <TextArea label="Observação" id="observation" name="observation" value={formData.observation} onChange={handleChange} />
             <div className="flex justify-end pt-4">
-                <Button type="submit">{client ? 'Atualizar Cliente' : 'Cadastrar Cliente'}</Button>
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Salvando...</span>
+                        </div>
+                    ) : (
+                        client ? 'Atualizar Cliente' : 'Cadastrar Cliente'
+                    )}
+                </Button>
             </div>
         </form>
     );
