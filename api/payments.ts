@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     if (req.method === 'GET') {
-      const result = await pool.query('SELECT * FROM pagamentos ORDER BY payment_date DESC');
+      const result = await pool.query('SELECT * FROM public.pagamentos ORDER BY payment_date DESC');
       return res.json(result.rows.map(r => ({
         id: r.id,
         clientId: r.client_id,
@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       const p = req.body;
       const result = await pool.query(
-        'INSERT INTO pagamentos (client_id, payment_date, amount, observation) VALUES ($1, $2, $3, $4) RETURNING *',
+        'INSERT INTO public.pagamentos (client_id, payment_date, amount, observation) VALUES ($1, $2, $3, $4) RETURNING *',
         [p.clientId, p.paymentDate, p.amount, p.observation]
       );
       return res.json(result.rows[0]);
@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === 'DELETE') {
       if (!id) return res.status(400).json({ error: 'ID is required' });
-      await pool.query('DELETE FROM pagamentos WHERE id = $1', [id]);
+      await pool.query('DELETE FROM public.pagamentos WHERE id = $1', [id]);
       return res.json({ success: true });
     }
 

@@ -17,12 +17,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     console.log(`[HANDLER LOG] Querying user: ${username}...`);
-    const result = await pool.query('SELECT * FROM usuarios WHERE username = $1', [username]);
+    const result = await pool.query('SELECT * FROM public.usuarios WHERE username = $1', [username]);
     console.log(`[HANDLER LOG] Query completed. Rows found: ${result.rows.length}`);
     
     if (result.rows.length === 0) {
       // Check if ANY users exist
-      const totalUsers = await pool.query('SELECT count(*) as count FROM usuarios');
+      const totalUsers = await pool.query('SELECT count(*) as count FROM public.usuarios');
       const count = parseInt(totalUsers.rows[0].count);
       console.log(`[HANDLER LOG] Total users in table: ${count}`);
       
