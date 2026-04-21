@@ -1,14 +1,12 @@
-import React, { FC, useMemo } from 'react';
-import { Card } from '../common';
+import React, { FC } from 'react';
 import { View } from '../../types';
 import { 
     UserPlusIcon, 
     ArchiveIcon, 
-    AddressBookIcon, 
+    UsersIcon, 
     BarChartIcon, 
     HistoryIcon, 
     ShoppingCartIcon, 
-    UsersIcon,
     CreditCardIcon 
 } from '../ui/Icons';
 
@@ -17,53 +15,97 @@ interface DashboardProps {
 }
 
 export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
-    const navItems = [
-        { id: 'add_client', icon: UserPlusIcon, title: 'Cadastrar Cliente' },
-        { id: 'pending_payments', icon: CreditCardIcon, title: 'Ver Falta Pagar' },
-        { id: 'reports', icon: BarChartIcon, title: 'Ver Relatórios' },
-        { id: 'history', icon: HistoryIcon, title: 'Histórico Completo' },
-    ];
-
     return (
-        <div className="h-full flex flex-col justify-center py-6 md:py-12">
-            {/* Primary Actions - Giant Focus Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
-                {/* CARD VERDE - Nova Venda */}
-                <button 
-                    onClick={() => onNavigate('add_sale')} 
-                    className="card-acao bg-emerald-500 text-white min-h-[160px] md:min-h-[300px] md:text-3xl"
-                >
-                    <div className="mb-4 md:mb-6">
-                        <ShoppingCartIcon className="w-10 h-10 md:w-16 md:h-16 text-white" />
-                    </div>
-                    <h3 className="italic">Nova venda</h3>
-                    <p className="text-emerald-50 text-xs md:text-lg font-medium opacity-90 px-4">Anotar uma venda nova no caderninho. 🌸</p>
-                </button>
+        <div className="space-y-10 animate-view-enter">
+            {/* Ações Rápidas */}
+            <section>
+                <h2 className="text-2xl font-black text-rose-900 mb-2">Ações Rápidas</h2>
+                <p className="text-gray-500 mb-6 font-medium">Comece por aqui para as tarefas mais comuns.</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button 
+                        onClick={() => onNavigate('add_sale')}
+                        className="flex items-center gap-6 p-6 md:p-8 bg-rose-50 border-2 border-rose-100 rounded-[32px] hover:shadow-xl hover:shadow-rose-100/50 transition-all group active:scale-[0.98] text-left"
+                    >
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                            <ShoppingCartIcon className="w-8 h-8 text-rose-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-rose-900">Nova Venda</h3>
+                            <p className="text-rose-400 font-medium">Registrar uma nova venda.</p>
+                        </div>
+                    </button>
 
-                {/* CARD AMARELO - Novo Pagamento */}
-                <button 
-                    onClick={() => onNavigate('add_payment')} 
-                    className="card-acao bg-amber-500 text-white min-h-[160px] md:min-h-[300px] md:text-3xl"
-                >
-                    <div className="mb-4 md:mb-6">
-                        <CreditCardIcon className="w-10 h-10 md:w-16 md:h-16 text-white" />
-                    </div>
-                    <h3 className="italic">Receber</h3>
-                    <p className="text-amber-50 text-xs md:text-lg font-medium opacity-90 px-4">Anotar um pagamento que você recebeu. 💰</p>
-                </button>
+                    <button 
+                        onClick={() => onNavigate('add_payment')}
+                        className="flex items-center gap-6 p-6 md:p-8 bg-emerald-50 border-2 border-emerald-100 rounded-[32px] hover:shadow-xl hover:shadow-emerald-100/50 transition-all group active:scale-[0.98] text-left"
+                    >
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                            <CreditCardIcon className="w-8 h-8 text-emerald-500" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-black text-emerald-900">Receber Pagamento</h3>
+                            <p className="text-emerald-400 font-medium">Registrar um pagamento.</p>
+                        </div>
+                    </button>
+                </div>
+            </section>
 
-                {/* CARD AZUL - Clientes */}
-                <button 
-                    onClick={() => onNavigate('clients')} 
-                    className="card-acao bg-sky-500 text-white min-h-[160px] md:min-h-[300px] md:text-3xl"
-                >
-                    <div className="mb-4 md:mb-6">
-                        <UsersIcon className="w-10 h-10 md:w-16 md:h-16 text-white" />
-                    </div>
-                    <h3 className="italic">Clientes</h3>
-                    <p className="text-sky-50 text-xs md:text-lg font-medium opacity-90 px-4">Ver minha lista de clientes e o que elas compraram. 👤</p>
-                </button>
-            </div>
+            {/* Outras Opções */}
+            <section>
+                <h2 className="text-2xl font-black text-rose-900 mb-6">Outras Opções</h2>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <button 
+                        onClick={() => onNavigate('add_client')}
+                        className="flex flex-col items-center justify-center p-6 bg-white border border-rose-50 rounded-[28px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
+                    >
+                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <UserPlusIcon className="w-7 h-7 text-pink-500" />
+                        </div>
+                        <span className="font-bold text-gray-700 text-sm">Cadastrar Cliente</span>
+                    </button>
+
+                    <button 
+                         onClick={() => onNavigate('stock')}
+                        className="flex flex-col items-center justify-center p-6 bg-white border border-rose-50 rounded-[28px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
+                    >
+                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <ArchiveIcon className="w-7 h-7 text-pink-500" />
+                        </div>
+                        <span className="font-bold text-gray-700 text-sm">Estoque</span>
+                    </button>
+
+                    <button 
+                        onClick={() => onNavigate('clients')}
+                        className="flex flex-col items-center justify-center p-6 bg-white border border-rose-50 rounded-[28px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
+                    >
+                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <UsersIcon className="w-7 h-7 text-pink-500" />
+                        </div>
+                        <span className="font-bold text-gray-700 text-sm">Ver Todos Clientes</span>
+                    </button>
+
+                    <button 
+                        onClick={() => onNavigate('reports')}
+                        className="flex flex-col items-center justify-center p-6 bg-white border border-rose-50 rounded-[28px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
+                    >
+                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <BarChartIcon className="w-7 h-7 text-pink-500" />
+                        </div>
+                        <span className="font-bold text-gray-700 text-sm">Análise de Vendas</span>
+                    </button>
+
+                    <button 
+                        onClick={() => onNavigate('history')}
+                        className="flex flex-col items-center justify-center p-6 bg-white border border-rose-50 rounded-[28px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
+                    >
+                        <div className="w-14 h-14 bg-pink-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                            <HistoryIcon className="w-7 h-7 text-pink-500" />
+                        </div>
+                        <span className="font-bold text-gray-700 text-sm">Histórico Completo</span>
+                    </button>
+                </div>
+            </section>
         </div>
     );
 };

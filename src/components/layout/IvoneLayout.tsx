@@ -34,111 +34,52 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
     ];
 
     return (
-        <div className="min-h-screen bg-[#fdf2f5] flex flex-col md:flex-row pb-20 md:pb-0">
-            {/* Desktop Sidebar */}
-            <aside className="hidden md:flex w-64 bg-white border-r border-pink-100 flex-col sticky top-0 h-screen z-30">
-                <div className="p-6">
-                    <h1 className="text-2xl font-black text-[#e91e63] flex items-center gap-2">
-                        Ivone Vendas ❤️
+        <div className="min-h-screen bg-[#FFF9FB] flex flex-col pb-20 md:pb-10">
+            {/* Top Info Bar */}
+            <div className="w-full text-center py-2 text-gray-400 text-xs font-medium">
+                Ivone 2026
+            </div>
+
+            <div className="max-w-7xl mx-auto w-full px-4 md:px-8">
+                {/* Centered Greeting Header */}
+                <header className="py-6 md:py-10 text-center relative">
+                    <h1 className="text-3xl md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-3">
+                        Olá, Ivone! ❤️ ✨
                     </h1>
-                </div>
-                
-                <nav className="flex-1 px-4 space-y-2 py-4">
-                    {mobileNavItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveView(item.id as View)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                                activeView === item.id 
-                                ? 'bg-pink-50 text-[#e91e63]' 
-                                : 'text-gray-500 hover:bg-gray-50 hover:text-pink-400'
-                            }`}
-                        >
-                            <item.icon className="w-5 h-5" />
-                            <span>{item.label}</span>
-                        </button>
-                    ))}
                     
-                    <button
-                        onClick={() => setActiveView('reports')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                            activeView === 'reports' 
-                            ? 'bg-pink-50 text-[#e91e63]' 
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-pink-400'
-                        }`}
-                    >
-                        <ArchiveIcon className="w-5 h-5" />
-                        <span>Relatórios</span>
-                    </button>
-                    
-                    <button
-                        onClick={() => setActiveView('history')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
-                            activeView === 'history' 
-                            ? 'bg-pink-50 text-[#e91e63]' 
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-pink-400'
-                        }`}
-                    >
-                        <SettingsIcon className="w-5 h-5" />
-                        <span>Histórico</span>
-                    </button>
-                </nav>
-
-                <div className="p-4 border-t border-pink-50">
-                    <button 
-                        onClick={logout}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all font-bold"
-                    >
-                        <LogOutIcon className="w-5 h-5" />
-                        <span>Sair</span>
-                    </button>
-                </div>
-            </aside>
-
-            <div className="flex-1 flex flex-col min-w-0">
-                {/* Top Bar (Mobile Only / Common Header) */}
-                <header className="p-3 md:p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
-                    <div className="flex-1 flex justify-start items-center gap-3">
-                        <h1 className="text-lg md:text-2xl font-black text-[#e91e63] flex items-center gap-2 md:hidden">
-                            Ivone ❤️
-                        </h1>
-                        <h2 className="hidden md:block text-xl font-bold text-rose-800">
-                            Olá, Ivone! 🌸
-                        </h2>
-                        <button 
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
+                         <button 
                             onClick={logout}
-                            className="p-2 text-pink-300 hover:text-pink-500 transition-colors md:hidden"
-                            title="Sair"
+                            className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-[#e91e63] font-bold transition-colors"
                         >
-                            <LogOutIcon className="w-4 h-4 md:w-5 md:h-5" />
+                            <LogOutIcon className="w-5 h-5" />
+                            <span>Sair</span>
                         </button>
                     </div>
-                    
+
                     {activeView !== 'dashboard' && (
-                        <button 
-                            onClick={onBack}
-                            className="flex items-center gap-1 md:gap-2 px-3 md:px-4 py-1.5 md:py-2 bg-white border border-pink-100 text-pink-600 rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold text-xs md:text-sm"
-                        >
-                            <ArrowLeftIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
-                            <span>Voltar</span>
-                        </button>
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                            <button 
+                                onClick={onBack}
+                                className="flex items-center gap-2 px-4 py-2 bg-white border border-pink-100 text-[#e91e63] rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold"
+                            >
+                                <ArrowLeftIcon className="w-4 h-4" />
+                                <span>Voltar</span>
+                            </button>
+                        </div>
                     )}
                 </header>
 
                 {/* Header Summary - Only show on dashboard */}
                 {activeView === 'dashboard' && <HeaderSummary setActiveView={setActiveView} />}
 
-                <div className="flex-1 flex flex-col overflow-hidden">
-                    {/* Main Content Area */}
-                    <main className="flex-1 overflow-y-auto p-4 md:p-8">
-                        <div className="max-w-7xl mx-auto">
-                            {children}
-                        </div>
-                    </main>
-                </div>
+                {/* Main Content Area */}
+                <main className="mt-6 md:mt-10">
+                    {children}
+                </main>
             </div>
 
-            {/* Mobile Bottom Navigation */}
+            {/* Mobile Bottom Navigation (Always present for utility) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-pink-100 flex items-center justify-around px-2 py-3 pb-[calc(12px+env(safe-area-inset-bottom))] z-40 shadow-[0_-4px_20px_rgba(233,30,99,0.1)]">
                 {mobileNavItems.map(item => (
                     <button
@@ -153,6 +94,14 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                     </button>
                 ))}
             </nav>
+
+            <button 
+                onClick={logout}
+                className="hidden md:flex items-center gap-2 fixed bottom-8 right-8 p-4 bg-white border border-pink-100 text-gray-400 hover:text-red-500 rounded-full shadow-lg transition-all font-bold md:hidden"
+            >
+                <LogOutIcon className="w-5 h-5" />
+                <span>Sair</span>
+            </button>
 
             {/* Toast Notifications */}
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}
