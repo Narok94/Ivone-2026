@@ -37,14 +37,24 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
         <div className="min-h-screen bg-[#FFF9FB] flex flex-col pb-20 md:pb-10">
             {/* Top Info Bar */}
             <div className="w-full text-center py-2 text-gray-400 text-xs font-medium">
-                Ivone 2026
+                Ivone-2026 | Caderninho Digital
             </div>
 
-            <div className="max-w-7xl mx-auto w-full px-4 md:px-8">
+            <div className="max-w-7xl mx-auto w-full px-4 md:px-8 relative">
+                {/* Notebook Background effect for the whole center */}
+                <div className="absolute inset-0 bg-white shadow-xl rounded-[2rem] paper-texture -z-10 border border-pink-100" />
+                
+                {/* Spiral Rings for Layout */}
+                <div className="notebook-spiral-container hidden lg:flex">
+                    {Array.from({ length: 24 }).map((_, i) => (
+                        <div key={i} className="notebook-ring" />
+                    ))}
+                </div>
+
                 {/* Centered Greeting Header */}
                 <header className="py-6 md:py-10 text-center relative">
                     <h1 className="text-3xl md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-3">
-                        Olá, Ivone! ❤️ ✨
+                        Olá, Ivone! 💘 ✨
                     </h1>
                     
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">

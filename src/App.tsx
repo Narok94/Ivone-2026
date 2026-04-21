@@ -92,53 +92,63 @@ const App: FC = () => {
 
     // Standard User View Logic
     return (
-        <IvoneLayout 
-            activeView={activeView} 
-            setActiveView={(v) => navigate(v as View)} 
-            onBack={handleBack}
-            toast={toast} 
-            setToast={setToast}
-        >
-            {activeView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-            {activeView === 'clients' && <ManageClients setActiveView={(v) => navigate(v as View)} onViewClient={handleViewClient} showToast={showToast} />}
-            {activeView === 'add_client' && (
-                <div className="max-w-2xl mx-auto">
-                    <h1 className="text-2xl font-bold text-rose-800 mb-6">Cadastrar Novo Cliente 👤</h1>
-                    <ClientForm onDone={() => navigate('clients')} />
+        <div className="relative min-h-screen">
+            <IvoneLayout 
+                activeView={activeView} 
+                setActiveView={(v) => navigate(v as View)} 
+                onBack={handleBack}
+                toast={toast} 
+                setToast={setToast}
+            >
+                <div className={!user ? 'blur-md pointer-events-none transition-all duration-700 opacity-50' : 'transition-all duration-700'}>
+                    {activeView === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
+                    {activeView === 'clients' && <ManageClients setActiveView={(v) => navigate(v as View)} onViewClient={handleViewClient} showToast={showToast} />}
+                    {activeView === 'add_client' && (
+                        <div className="max-w-2xl mx-auto">
+                            <h1 className="text-2xl font-bold text-rose-800 mb-6">Cadastrar Novo Cliente 👤</h1>
+                            <ClientForm onDone={() => navigate('clients')} />
+                        </div>
+                    )}
+                    {activeView === 'client_detail' && selectedClientId && (
+                        <ClientDetail clientId={selectedClientId} onNavigate={handleNavigate} />
+                    )}
+                    {activeView === 'add_sale' && (
+                        <SaleForm 
+                            editingSale={editingSale} 
+                            prefilledClientId={selectedClientId}
+                            onSaleSuccess={() => {
+                                setEditingSale(null);
+                                navigate('sales_view');
+                                showToast(editingSale ? 'Venda atualizada!' : 'Venda registrada!');
+                            }} 
+                        />
+                    )}
+                    {activeView === 'add_payment' && (
+                        <PaymentForm 
+                            editingPayment={editingPayment}
+                            prefilledClientId={selectedClientId}
+                            onPaymentSuccess={() => {
+                                setEditingPayment(null);
+                                navigate('all_payments');
+                                showToast(editingPayment ? 'Pagamento atualizado!' : 'Pagamento recebido!');
+                            }}
+                        />
+                    )}
+                    {activeView === 'sales_view' && <SalesView onEditSale={handleEditSale} showToast={showToast} />}
+                    {activeView === 'all_payments' && <AllPayments onEditPayment={handleEditPayment} showToast={showToast} />}
+                    {activeView === 'pending_payments' && <PendingPayments onViewClient={handleViewClient} />}
+                    {activeView === 'reports' && <Reports />}
+                    {activeView === 'history' && <History />}
+                    {activeView === 'stock' && <Stock />}
+                </div>
+            </IvoneLayout>
+
+            {!user && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/10 backdrop-blur-[2px]">
+                    <Login />
                 </div>
             )}
-            {activeView === 'client_detail' && selectedClientId && (
-                <ClientDetail clientId={selectedClientId} onNavigate={handleNavigate} />
-            )}
-            {activeView === 'add_sale' && (
-                <SaleForm 
-                    editingSale={editingSale} 
-                    prefilledClientId={selectedClientId}
-                    onSaleSuccess={() => {
-                        setEditingSale(null);
-                        navigate('sales_view');
-                        showToast(editingSale ? 'Venda atualizada!' : 'Venda registrada!');
-                    }} 
-                />
-            )}
-            {activeView === 'add_payment' && (
-                <PaymentForm 
-                    editingPayment={editingPayment}
-                    prefilledClientId={selectedClientId}
-                    onPaymentSuccess={() => {
-                        setEditingPayment(null);
-                        navigate('all_payments');
-                        showToast(editingPayment ? 'Pagamento atualizado!' : 'Pagamento recebido!');
-                    }}
-                />
-            )}
-            {activeView === 'sales_view' && <SalesView onEditSale={handleEditSale} showToast={showToast} />}
-            {activeView === 'all_payments' && <AllPayments onEditPayment={handleEditPayment} showToast={showToast} />}
-            {activeView === 'pending_payments' && <PendingPayments onViewClient={handleViewClient} />}
-            {activeView === 'reports' && <Reports />}
-            {activeView === 'history' && <History />}
-            {activeView === 'stock' && <Stock />}
-        </IvoneLayout>
+        </div>
     );
 };
 

@@ -365,3 +365,42 @@ body {
 .theme-admin-dark .focus\:ring-pink-400:focus { --tw-ring-color: var(--accent-primary); }
 .theme-admin-dark .focus\:border-pink-400:focus { border-color: var(--accent-primary); }
 .theme-admin-dark select { color-scheme: dark; }
+
+/* --- NOTEBOOK STYLE --- */
+.notebook-page {
+    position: relative;
+    background-color: #ffffff;
+    background-image: 
+        linear-gradient(rgba(233, 30, 99, 0.05) 2px, transparent 2px);
+    background-size: 100% 3rem;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15);
+    border-left: 2px solid #e5e7eb;
+}
+
+.notebook-spiral-container {
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    padding: 30px 0;
+    pointer-events: none;
+    z-index: 50;
+}
+
+.notebook-ring {
+    width: 40px;
+    height: 12px;
+    background: linear-gradient(to bottom, #d4d4d8, #a1a1aa, #d4d4d8);
+    border-radius: 6px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.paper-texture {
+    background-color: #fff;
+    background-image: url("https://www.transparenttextures.com/patterns/white-paper.png");
+}
