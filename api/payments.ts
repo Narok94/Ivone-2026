@@ -1,4 +1,4 @@
-import { pool } from '../src/lib/db';
+import { pool } from './db.js';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

@@ -4,13 +4,13 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { initDb } from './src/lib/db';
+import { initDb } from './api/db.js';
 
 // Import serverless handlers
-import loginHandler from './api/login';
-import clientsHandler from './api/clients';
-import salesHandler from './api/sales';
-import paymentsHandler from './api/payments';
+import loginHandler from './api/login.js';
+import clientsHandler from './api/clients.js';
+import salesHandler from './api/sales.js';
+import paymentsHandler from './api/payments.js';
 
 dotenv.config();
 

@@ -14,7 +14,7 @@ console.log(' - DATABASE_URL:', process.env.DATABASE_URL ? 'DEFINED' : 'MISSING'
 if (typeof window === 'undefined') {
   try {
     // Enable fetch for potentially better compatibility in some environments
-    neonConfig.useFetch = true;
+    (neonConfig as any).useFetch = true;
     const wsConstructor = (ws as any).default || ws;
     neonConfig.webSocketConstructor = wsConstructor;
     console.log('[DB LOG] Neon Config: useFetch=true, WebSocket constructor set.');
