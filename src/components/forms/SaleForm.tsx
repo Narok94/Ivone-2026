@@ -223,13 +223,13 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             type="date" 
                             value={saleDate} 
                             onChange={e => setSaleDate(e.target.value)}
-                            className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                            className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                         />
                     </div>
 
                     <div className="space-y-4 md:space-y-6">
                         {items.map((item, index) => (
-                            <div key={item.id} className="p-4 md:p-6 bg-rose-50/30 rounded-[24px] md:rounded-[32px] border-2 border-rose-50 relative animate-view-enter">
+                            <div key={item.id} className="p-3 md:p-6 bg-rose-50/30 rounded-[20px] md:rounded-[32px] border-2 border-rose-50 relative animate-view-enter">
                                 {items.length > 1 && (
                                     <button
                                         type="button"
@@ -247,7 +247,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         placeholder="Ex: 123" 
                                         value={item.productCode} 
                                         onChange={e => handleItemChange(index, 'productCode', e.target.value)}
-                                        className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                     <Input 
                                         label="Qual o produto? * 💄" 
@@ -255,7 +255,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         value={item.productName} 
                                         onChange={e => handleItemChange(index, 'productName', e.target.value)} 
                                         required
-                                        className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                 </div>
 
@@ -267,7 +267,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         value={item.quantity} 
                                         onChange={e => handleItemChange(index, 'quantity', e.target.value)} 
                                         required
-                                        className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                     <div className="space-y-1 md:space-y-2">
                                         <label className="block text-[10px] md:text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Preço Cada 💸</label>
@@ -283,7 +283,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                                 onFocus={(e) => e.target.value === '0' && handleItemChange(index, 'unitPrice', '')}
                                                 onBlur={(e) => e.target.value === '' && handleItemChange(index, 'unitPrice', '0')}
                                                 required
-                                                className="pl-9 md:pl-16 text-base md:text-xl font-black py-3 md:py-4 border-2 border-rose-100 bg-rose-50/50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-200/50 rounded-[20px] md:rounded-[24px] transition-all"
+                                                className="w-full pl-9 pr-3 md:pl-16 md:pr-6 text-base md:text-xl font-black py-3 md:py-4 border-2 border-rose-100 bg-rose-50/50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-200/50 rounded-[20px] md:rounded-[24px] transition-all"
                                             />
                                         </div>
                                     </div>
@@ -316,12 +316,12 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             placeholder="Ex: Entrega no sábado..."
                             value={observation} 
                             onChange={e => setObservation(e.target.value)}
-                            className="text-base md:text-xl py-3 md:py-4 px-5 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                            className="w-full text-base md:text-xl py-3 md:py-4 px-4 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                         />
 
-                        <div className="bg-emerald-500 rounded-[24px] md:rounded-[32px] p-4 md:p-6 text-white text-center shadow-lg shadow-emerald-200">
-                            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-1">Total Geral do Pedido</p>
-                            <p className="text-2xl md:text-4xl font-black">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        <div className="bg-emerald-500 rounded-[24px] md:rounded-[32px] p-3 md:p-6 text-white text-center shadow-lg shadow-emerald-200">
+                            <p className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-0.5 md:mb-1">Total Geral do Pedido</p>
+                            <p className="text-xl md:text-4xl font-black">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                         </div>
 
                         <div className="pt-2">
