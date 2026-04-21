@@ -52,32 +52,35 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 </div>
 
                 {/* Centered Greeting Header */}
-                <header className="py-6 md:py-10 text-center relative">
-                    <h1 className="text-3xl md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-3">
-                        Olá, Ivone! 💘 ✨
+                <header className="py-6 md:py-10 text-center relative px-16">
+                    <h1 className="text-lg md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-2">
+                        Olá, Ivone! 💘
                     </h1>
                     
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 hidden md:block">
-                         <button 
-                            onClick={logout}
-                            className="flex items-center gap-2 px-4 py-2 text-gray-400 hover:text-[#e91e63] font-bold transition-colors"
-                        >
-                            <LogOutIcon className="w-5 h-5" />
-                            <span>Sair</span>
-                        </button>
-                    </div>
-
-                    {activeView !== 'dashboard' && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2">
+                    {/* Navigation Actions - Top Right */}
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {activeView !== 'dashboard' && (
                             <button 
                                 onClick={onBack}
-                                className="flex items-center gap-2 px-4 py-2 bg-white border border-pink-100 text-[#e91e63] rounded-full shadow-sm hover:shadow-md transition-all active:scale-95 font-bold"
+                                className="p-2.5 bg-white border border-pink-100 text-[#e91e63] rounded-full shadow-sm active:scale-90 transition-all"
+                                title="Voltar"
                             >
-                                <ArrowLeftIcon className="w-4 h-4" />
-                                <span>Voltar</span>
+                                <ArrowLeftIcon className="w-5 h-5" />
                             </button>
+                        )}
+                        
+                        <button 
+                            onClick={logout}
+                            className="p-2.5 text-gray-300 hover:text-[#e91e63] transition-all active:scale-90"
+                            title="Sair do Caderninho"
+                        >
+                            <LogOutIcon className="w-5 h-5 md:w-6 md:h-6" />
+                        </button>
+                        
+                        <div className="hidden md:block ml-1 border-l border-pink-100 pl-3 h-6 flex items-center">
+                             <span className="text-[10px] text-gray-300 font-bold uppercase tracking-widest whitespace-nowrap">Sair</span>
                         </div>
-                    )}
+                    </div>
                 </header>
 
                 {/* Header Summary - Only show on dashboard */}

@@ -17,12 +17,17 @@ interface DashboardProps {
 export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
     return (
         <div className="space-y-10 animate-view-enter">
+            {/* Header / Intro */}
+            <div className="flex justify-between items-end">
+                <div>
+                    <h2 className="text-2xl font-black text-rose-900 mb-2">Ações Rápidas</h2>
+                    <p className="text-gray-500 font-medium">O que vamos registrar hoje?</p>
+                </div>
+            </div>
+            
             {/* Ações Rápidas */}
             <section>
-                <h2 className="text-2xl font-black text-rose-900 mb-2">Ações Rápidas</h2>
-                <p className="text-gray-500 mb-6 font-medium">Comece por aqui para as tarefas mais comuns.</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                     <button 
                         onClick={() => onNavigate('add_sale')}
                         className="flex items-center gap-6 p-6 md:p-8 bg-rose-50 border-2 border-rose-100 rounded-[32px] hover:shadow-xl hover:shadow-rose-100/50 transition-all group active:scale-[0.98] text-left"
