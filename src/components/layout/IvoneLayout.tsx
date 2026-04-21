@@ -13,6 +13,7 @@ import { HeaderSummary } from './HeaderSummary';
 import { Toast } from '../ui';
 import { View } from '../../types';
 import { AIAssistant } from '../ai/AIAssistant';
+import { useData } from '../../contexto/DataContext';
 
 interface IvoneLayoutProps {
     children: React.ReactNode;
@@ -24,6 +25,7 @@ interface IvoneLayoutProps {
 }
 
 export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, onBack, toast, setToast }) => {
+    const { logout } = useData();
     const mobileNavItems = [
         { id: 'dashboard', icon: HomeIcon, label: 'Início' },
         { id: 'clients', icon: UsersIcon, label: 'Clientes' },
@@ -35,10 +37,17 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
         <div className="min-h-screen bg-[#fdf2f5] flex flex-col pb-20 md:pb-0">
             {/* Top Bar */}
             <header className="p-3 md:p-4 flex items-center justify-between relative z-20 bg-[#fdf2f5]/80 backdrop-blur-md sticky top-0">
-                <div className="flex-1 flex justify-start">
+                <div className="flex-1 flex justify-start items-center gap-3">
                     <h1 className="text-lg md:text-2xl font-black text-[#e91e63] flex items-center gap-2">
                         Olá, Ivone! ❤️
                     </h1>
+                    <button 
+                        onClick={logout}
+                        className="p-2 text-pink-300 hover:text-pink-500 transition-colors"
+                        title="Sair"
+                    >
+                        <LogOutIcon className="w-4 h-4 md:w-5 md:h-5" />
+                    </button>
                 </div>
                 
                 {activeView !== 'dashboard' && (

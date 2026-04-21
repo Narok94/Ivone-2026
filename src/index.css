@@ -4,6 +4,12 @@
   --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
 }
 
+@layer components {
+    .card-acao {
+        @apply h-[150px] text-[1.2rem] font-bold rounded-[20px] flex flex-col items-center justify-center transition-transform duration-200 active:scale-95 shadow-[0_4px_15px_rgba(0,0,0,0.1)];
+    }
+}
+
 body {
     font-family: 'Poppins', sans-serif;
     background-color: #FFF9FB; /* Fallback for tailwind bg-pink-50 */

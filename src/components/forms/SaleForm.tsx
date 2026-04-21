@@ -109,88 +109,149 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
     const total = useMemo(() => (parseFloat(saleData.quantity) || 0) * (parseFloat(saleData.unitPrice) || 0), [saleData.quantity, saleData.unitPrice]);
 
     return (
-        <Card>
-            <h1 className="text-2xl font-bold text-rose-800 mb-6 italic">{isEditing ? 'Editar Venda' : 'Registrar uma Nova Venda'} 🛍️</h1>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <div ref={clientSelectRef}>
-                        <label htmlFor="client-select-button" className="block text-sm font-medium text-gray-700 mb-1">Quem encomendou? *</label>
-                        <div className="relative">
-                            <button
-                                type="button"
-                                id="client-select-button"
-                                onClick={() => setIsClientDropdownOpen(prev => !prev)}
-                                className="w-full px-4 py-2 text-left bg-white/70 border border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition-shadow"
-                                aria-haspopup="listbox"
-                                aria-expanded={isClientDropdownOpen}
-                            >
-                                {saleData.clientId ? clients.find(c => c.id === saleData.clientId)?.fullName : <span className="text-gray-500">Selecione um cliente</span>}
-                            </button>
-                            {isClientDropdownOpen && (
-                                <div className="absolute z-10 w-full mt-1 bg-white rounded-2xl shadow-lg border border-gray-200 max-h-60 overflow-y-auto">
-                                    <div className="p-2">
-                                        <input
-                                            type="text"
-                                            value={clientSearch}
-                                            onChange={e => setClientSearch(e.target.value)}
-                                            placeholder="Buscar cliente..."
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-pink-400"
-                                            autoFocus
-                                        />
+        <div className="max-w-2xl mx-auto pb-10">
+            <h1 className="text-3xl font-black text-rose-800 mb-8 flex items-center gap-3 italic">
+                {isEditing ? 'Editar Venda' : 'Nova Venda'} 🛍️
+            </h1>
+
+            <Card className="p-6 md:p-10 border-rose-100 shadow-xl shadow-rose-200/20">
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div ref={clientSelectRef} className="space-y-2">
+                            <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Quem comprou? * 👤</label>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    id="client-select-button"
+                                    onClick={() => setIsClientDropdownOpen(prev => !prev)}
+                                    className="w-full px-6 py-4 text-left bg-white border-2 border-rose-50 rounded-[24px] shadow-sm focus:outline-none focus:border-rose-300 transition-all font-medium text-lg"
+                                    aria-haspopup="listbox"
+                                    aria-expanded={isClientDropdownOpen}
+                                >
+                                    {saleData.clientId ? clients.find(c => c.id === saleData.clientId)?.fullName : <span className="text-gray-400">Escolha a cliente...</span>}
+                                </button>
+                                {isClientDropdownOpen && (
+                                    <div className="absolute z-10 w-full mt-2 bg-white rounded-[24px] shadow-2xl border border-rose-100 max-h-60 overflow-y-auto animate-view-enter">
+                                        <div className="p-3 sticky top-0 bg-white">
+                                            <input
+                                                type="text"
+                                                value={clientSearch}
+                                                onChange={e => setClientSearch(e.target.value)}
+                                                placeholder="Buscar cliente..."
+                                                className="w-full px-4 py-3 border-2 border-rose-50 rounded-xl focus:outline-none focus:border-rose-200"
+                                                autoFocus
+                                            />
+                                        </div>
+                                        <ul role="listbox" className="p-1">
+                                            {filteredClients.map(c => (
+                                                <li
+                                                    key={c.id}
+                                                    onClick={() => handleClientSelect(c.id)}
+                                                    className="px-6 py-3 hover:bg-rose-50 cursor-pointer rounded-xl transition-colors font-medium"
+                                                    role="option"
+                                                    aria-selected={c.id === saleData.clientId}
+                                                >
+                                                    {c.fullName}
+                                                </li>
+                                            ))}
+                                            {filteredClients.length === 0 && (
+                                                <li className="px-6 py-3 text-gray-500 italic">Nenhum cliente encontrado.</li>
+                                            )}
+                                        </ul>
                                     </div>
-                                    <ul role="listbox">
-                                        {filteredClients.map(c => (
-                                            <li
-                                                key={c.id}
-                                                onClick={() => handleClientSelect(c.id)}
-                                                className="px-4 py-2 hover:bg-pink-50 cursor-pointer"
-                                                role="option"
-                                                aria-selected={c.id === saleData.clientId}
-                                            >
-                                                {c.fullName}
-                                            </li>
-                                        ))}
-                                        {filteredClients.length === 0 && (
-                                            <li className="px-4 py-2 text-gray-500">Nenhum cliente encontrado.</li>
-                                        )}
-                                    </ul>
-                                </div>
-                            )}
+                                )}
+                            </div>
+                            {clientError && <p className="text-rose-500 text-sm font-bold mt-1 ml-1">{clientError}</p>}
                         </div>
-                        {clientError && <p className="text-red-500 text-sm mt-1">{clientError}</p>}
+                        <Input 
+                            label="Data do Pedido 📅" 
+                            name="saleDate" 
+                            type="date" 
+                            value={saleData.saleDate} 
+                            onChange={handleChange}
+                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        />
                     </div>
-                    <div className="self-end">
-                      <Input label="Data do Pedido" name="saleDate" type="date" value={saleData.saleDate} onChange={handleChange} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <Input 
+                            label="Código (opcional) 🔢" 
+                            name="productCode" 
+                            type="number" 
+                            placeholder="Ex: 12345" 
+                            value={saleData.productCode} 
+                            onChange={handleChange}
+                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        />
+                        <Input 
+                            label="Qual o produto? * 💄" 
+                            name="productName" 
+                            placeholder="Ex: Sabonete Tododia"
+                            value={saleData.productName} 
+                            onChange={handleChange} 
+                            required
+                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        />
                     </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input label="Código do Produto (se tiver)" name="productCode" type="number" placeholder="Ex: 12345" value={saleData.productCode} onChange={handleChange} />
-                    <Input label="Nome do Produto" name="productName" value={saleData.productName} onChange={handleChange} required/>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Input label="Quantidade" name="quantity" type="number" min="1" value={saleData.quantity} onChange={handleChange} required/>
-                    <Input
-                        label="Valor Unitário (R$)"
-                        name="unitPrice"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={saleData.unitPrice}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <Input 
+                            label="Quantos? 📦" 
+                            name="quantity" 
+                            type="number" 
+                            min="1" 
+                            value={saleData.quantity} 
+                            onChange={handleChange} 
+                            required
+                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        />
+                        <div className="space-y-2">
+                            <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Valor Unitário 💸</label>
+                            <div className="relative">
+                                <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-xl">R$</span>
+                                <Input
+                                    label=""
+                                    name="unitPrice"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={saleData.unitPrice}
+                                    onChange={handleChange}
+                                    onFocus={(e) => e.target.value === '0' && setSaleData(prev => ({...prev, unitPrice: ''}))}
+                                    onBlur={(e) => e.target.value === '' && setSaleData(prev => ({...prev, unitPrice: '0'}))}
+                                    required
+                                    className="pl-16 text-xl font-black py-4 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Total</label>
+                            <div className="bg-emerald-50 rounded-[24px] p-4 flex items-center justify-center border-2 border-emerald-100 h-[62px]">
+                                <span className="text-2xl font-black text-emerald-600">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <Input 
+                        label="Algum detalhe? 📝" 
+                        name="observation" 
+                        placeholder="Ex: Entrega no sábado..."
+                        value={saleData.observation} 
                         onChange={handleChange}
-                        onFocus={(e) => e.target.value === '0' && setSaleData(prev => ({...prev, unitPrice: ''}))}
-                        onBlur={(e) => e.target.value === '' && setSaleData(prev => ({...prev, unitPrice: '0'}))}
-                        required
+                        className="text-xl py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
                     />
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Valor Total</label>
-                        <p className="w-full px-3 py-2 border bg-gray-100 border-gray-300 rounded-xl font-bold text-lg text-pink-600">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+
+                    <div className="pt-6">
+                        <Button 
+                            type="submit" 
+                            disabled={!saleData.clientId}
+                            className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
+                        >
+                            {isEditing ? 'Atualizar Venda ✨' : 'Colocar no Caderninho ✨'}
+                        </Button>
                     </div>
-                </div>
-                <TextArea label="Observação" name="observation" value={saleData.observation} onChange={handleChange} />
-                <div className="flex justify-end pt-4">
-                    <Button type="submit" disabled={!saleData.clientId}>{isEditing ? 'Atualizar Encomenda' : 'Colocar no Caderninho'}</Button>
-                </div>
-            </form>
-        </Card>
+                </form>
+            </Card>
+        </div>
     );
 };

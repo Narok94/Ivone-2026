@@ -19,11 +19,13 @@ import { PaymentForm } from './components/forms/PaymentForm';
 
 // Common Components
 import { Modal } from './components/common/Modal';
+import { Login } from './components/auth/Login';
 
 // Types
 import { Sale, Payment, View } from './types';
 
 const App: FC = () => {
+    const { user, isLoading } = useData();
     const [activeView, setActiveView] = useState<View>('dashboard');
     const [viewStack, setViewStack] = useState<View[]>([]);
     const [toast, setToast] = useState<string | null>(null);
@@ -74,6 +76,18 @@ const App: FC = () => {
         setEditingPayment(payment);
         navigate('add_payment');
     };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-[#fdf2f5] flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
+
+    if (!user) {
+        return <Login />;
+    }
 
     // Standard User View Logic
     return (

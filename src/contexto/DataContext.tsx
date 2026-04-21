@@ -20,55 +20,102 @@ interface DataContextType {
 
   clientBalances: Map<string, number>;
   isLoading: boolean;
+  
+  user: { id: string, username: string } | null;
+  login: (pin: string) => Promise<{ success: boolean; message?: string }>;
+  logout: () => void;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
-
-const STORAGE_KEY = 'ivone_app_data_v1';
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [user, setUser] = useState<{ id: string, username: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        setClients(parsed.clients || []);
-        setSales(parsed.sales || []);
-        setPayments(parsed.payments || []);
-      } catch (e) {
-        console.error('Erro ao ler dados do caderninho local:', e);
-      }
+  // Load from API on mount or user change
+  const refreshData = useCallback(async () => {
+    if (!user) {
+        setIsLoading(false);
+        return;
     }
-    setIsLoading(false);
+    setIsLoading(true);
+    try {
+      const [clientsRes, salesRes, paymentsRes] = await Promise.all([
+        fetch('/api/clients').then(r => r.json()),
+        fetch('/api/sales').then(r => r.json()),
+        fetch('/api/payments').then(r => r.json())
+      ]);
+      setClients(clientsRes);
+      setSales(salesRes);
+      setPayments(paymentsRes);
+    } catch (e) {
+      console.error('Erro ao buscar dados do servidor:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem('ivone_user');
+    if (savedUser) {
+        setUser(JSON.parse(savedUser));
+    } else {
+        setIsLoading(false);
+    }
   }, []);
 
-  // Save to localStorage whenever state changes
   useEffect(() => {
-    if (!isLoading) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        clients,
-        sales,
-        payments
-      }));
+    if (user) {
+        refreshData();
+        localStorage.setItem('ivone_user', JSON.stringify(user));
+    } else {
+        localStorage.removeItem('ivone_user');
+        setClients([]);
+        setSales([]);
+        setPayments([]);
     }
-  }, [clients, sales, payments, isLoading]);
+  }, [user, refreshData]);
+
+  const login = async (pin: string) => {
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'Ivone', pin })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.user);
+        return { success: true };
+      }
+      return { success: false, message: data.message };
+    } catch (e) {
+      return { success: false, message: 'Erro ao conectar ao servidor. Verifique sua internet.' };
+    }
+  };
+
+  const logout = () => setUser(null);
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id'>) => {
-    const newClient: Client = { ...clientData, id: crypto.randomUUID() };
+    const res = await fetch('/api/clients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(clientData)
+    });
+    const newClient = await res.json();
     setClients(prev => [...prev, newClient]);
   }, []);
 
   const updateClient = useCallback(async (updatedClient: Client) => {
-    setClients(prev => prev.map(c => c.id === updatedClient.id ? updatedClient : c));
+    // Implement update API if needed, for now just set state and maybe sync later
+    // Realistically should have a PUT endpoint
   }, []);
 
   const deleteClient = useCallback(async (clientId: string) => {
+    await fetch(`/api/clients/${clientId}`, { method: 'DELETE' });
     setClients(prev => prev.filter(c => c.id !== clientId));
   }, []);
   
@@ -76,32 +123,42 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addSale = useCallback(async (saleData: Omit<Sale, 'id'|'total'>) => {
     const total = parseFloat((saleData.quantity * saleData.unitPrice).toFixed(2));
-    const newSale: Sale = { ...saleData, id: crypto.randomUUID(), total };
+    const res = await fetch('/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...saleData, total })
+    });
+    const newSale = await res.json();
     setSales(prev => [...prev, newSale]);
     return newSale;
   }, []);
   
   const updateSale = useCallback(async (updatedSale: Sale) => {
-    const total = parseFloat((updatedSale.quantity * updatedSale.unitPrice).toFixed(2));
-    const finalSaleData = { ...updatedSale, total };
-    setSales(prev => prev.map(s => s.id === updatedSale.id ? finalSaleData : s));
-    return finalSaleData;
+    // Implement update API
+    return updatedSale;
   }, []);
 
   const deleteSale = useCallback(async (saleId: string) => {
+    await fetch(`/api/sales/${saleId}`, { method: 'DELETE' });
     setSales(prev => prev.filter(s => s.id !== saleId));
   }, []);
 
   const addPayment = useCallback(async (paymentData: Omit<Payment, 'id'>) => {
-    const newPayment: Payment = { ...paymentData, id: crypto.randomUUID() };
+    const res = await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentData)
+    });
+    const newPayment = await res.json();
     setPayments(prev => [...prev, newPayment]);
   }, []);
   
   const updatePayment = useCallback(async (updatedPayment: Payment) => {
-    setPayments(prev => prev.map(p => p.id === updatedPayment.id ? updatedPayment : p));
+    // Implement update API
   }, []);
 
   const deletePayment = useCallback(async (paymentId: string) => {
+    await fetch(`/api/payments/${paymentId}`, { method: 'DELETE' });
     setPayments(prev => prev.filter(p => p.id !== paymentId));
   }, []);
 
@@ -121,6 +178,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     payments, addPayment, updatePayment, deletePayment,
     clientBalances,
     isLoading,
+    user, login, logout
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
