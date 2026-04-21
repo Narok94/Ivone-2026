@@ -45,4 +45,5 @@ export type View =
   | 'pending_payments' 
   | 'sales_view' 
   | 'all_payments' 
+  | 'stock'
   | 'client_detail';

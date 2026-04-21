@@ -11,6 +11,7 @@ import { PendingPayments } from './components/dashboard/PendingPayments';
 import { ClientDetail } from './components/dashboard/ClientDetail';
 import { Reports } from './components/dashboard/Reports';
 import { History } from './components/dashboard/History';
+import { Stock } from './components/dashboard/Stock';
 
 // Form Components
 import { ClientForm } from './components/forms/ClientForm';
@@ -136,6 +137,7 @@ const App: FC = () => {
             {activeView === 'pending_payments' && <PendingPayments onViewClient={handleViewClient} />}
             {activeView === 'reports' && <Reports />}
             {activeView === 'history' && <History />}
+            {activeView === 'stock' && <Stock />}
         </IvoneLayout>
     );
 };

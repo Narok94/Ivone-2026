@@ -2,23 +2,34 @@ import React, { FC, useState, useEffect, useRef, useMemo } from 'react';
 import { useData } from '../../contexto/DataContext';
 import { Card, Button, Input, TextArea } from '../common';
 import { Sale } from '../../types';
+import { Trash2Icon, PlusIcon } from 'lucide-react';
+
+interface SaleItem {
+    id: string;
+    productCode: string;
+    productName: string;
+    quantity: string;
+    unitPrice: string;
+}
 
 export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sale, isEditing: boolean) => void; prefilledClientId: string | null; }> = ({ editingSale, onSaleSuccess, prefilledClientId }) => {
     const { clients, addSale, updateSale } = useData();
     const isEditing = !!editingSale;
     const clientSelectRef = useRef<HTMLDivElement>(null);
 
-    const initialFormState = {
-        clientId: prefilledClientId || '',
-        saleDate: new Date().toISOString().split('T')[0],
+    const initialItem = (): SaleItem => ({
+        id: Math.random().toString(36).substr(2, 9),
         productCode: '',
         productName: '',
         quantity: '1',
         unitPrice: '0',
-        observation: '',
-    };
+    });
+
+    const [clientId, setClientId] = useState(prefilledClientId || '');
+    const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+    const [observation, setObservation] = useState('');
+    const [items, setItems] = useState<SaleItem[]>([initialItem()]);
     
-    const [saleData, setSaleData] = useState(initialFormState);
     const [clientSearch, setClientSearch] = useState('');
     const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
     const [clientError, setClientError] = useState('');
@@ -33,17 +44,21 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
 
     useEffect(() => {
         if (editingSale) {
-            setSaleData({
-                clientId: editingSale.clientId,
-                saleDate: editingSale.saleDate,
+            setClientId(editingSale.clientId);
+            setSaleDate(editingSale.saleDate);
+            setObservation(editingSale.observation);
+            setItems([{
+                id: editingSale.id,
                 productCode: editingSale.productCode,
                 productName: editingSale.productName,
                 quantity: String(editingSale.quantity),
                 unitPrice: String(editingSale.unitPrice),
-                observation: editingSale.observation,
-            });
+            }]);
         } else {
-             setSaleData(initialFormState);
+             setClientId(prefilledClientId || '');
+             setSaleDate(new Date().toISOString().split('T')[0]);
+             setObservation('');
+             setItems([initialItem()]);
         }
     }, [editingSale, prefilledClientId]);
 
@@ -59,49 +74,78 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         };
     }, []);
 
-    const handleClientSelect = (clientId: string) => {
-        setSaleData(prev => ({ ...prev, clientId }));
+    const handleClientSelect = (id: string) => {
+        setClientId(id);
         setIsClientDropdownOpen(false);
         setClientSearch('');
         setClientError('');
     };
-    
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-        setSaleData(prev => ({...prev, [name]: value}));
+
+    const handleAddItem = () => {
+        setItems(prev => [...prev, initialItem()]);
+    };
+
+    const handleRemoveItem = (index: number) => {
+        if (items.length <= 1) return;
+        setItems(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleItemChange = (index: number, name: keyof SaleItem, value: string) => {
+        setItems(prev => prev.map((item, i) => i === index ? { ...item, [name]: value } : item));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setClientError('');
 
-        if (!saleData.clientId) {
+        if (!clientId) {
             setClientError('É obrigatório selecionar um cliente para registrar a encomenda.');
             return;
         }
 
-        const quantity = parseFloat(saleData.quantity) || 0;
-        const unitPrice = parseFloat(saleData.unitPrice) || 0;
-
-        if (quantity <= 0) {
-            alert('A quantidade da encomenda deve ser maior que zero.');
-            return;
-        }
-
-        const salePayload = {
-            ...saleData,
-            quantity: quantity,
-            unitPrice: unitPrice,
-        };
-
         setIsSubmitting(true);
         try {
             if (isEditing && editingSale) {
-                const updatedSale = await updateSale({ ...salePayload, id: editingSale.id, total: 0 }); // total is recalculated in context
+                const item = items[0];
+                const quantity = parseFloat(item.quantity) || 0;
+                const unitPrice = parseFloat(item.unitPrice) || 0;
+                
+                const updatedSale = await updateSale({ 
+                    id: editingSale.id,
+                    clientId,
+                    saleDate,
+                    observation,
+                    productCode: item.productCode,
+                    productName: item.productName,
+                    quantity,
+                    unitPrice,
+                    total: 0 // recalculated in context
+                });
                 onSaleSuccess(updatedSale, true);
             } else {
-                const newSale = await addSale(salePayload);
-                onSaleSuccess(newSale, false);
+                let firstSaleId = '';
+                let lastSale: any = null;
+
+                for (const item of items) {
+                    const quantity = parseFloat(item.quantity) || 0;
+                    const unitPrice = parseFloat(item.unitPrice) || 0;
+                    
+                    if (quantity <= 0) continue;
+
+                    lastSale = await addSale({
+                        clientId,
+                        saleDate,
+                        observation,
+                        productCode: item.productCode,
+                        productName: item.productName,
+                        quantity,
+                        unitPrice,
+                    });
+                }
+                
+                if (lastSale) {
+                    onSaleSuccess(lastSale, false);
+                }
             }
         } catch (error: any) {
             alert(`Erro ao salvar encomenda: ${error.message}`);
@@ -110,7 +154,13 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         }
     };
 
-    const total = useMemo(() => (parseFloat(saleData.quantity) || 0) * (parseFloat(saleData.unitPrice) || 0), [saleData.quantity, saleData.unitPrice]);
+    const total = useMemo(() => {
+        return items.reduce((acc, item) => {
+            const q = parseFloat(item.quantity) || 0;
+            const p = parseFloat(item.unitPrice) || 0;
+            return acc + (q * p);
+        }, 0);
+    }, [items]);
 
     return (
         <div className="max-w-2xl mx-auto pb-10">
@@ -132,7 +182,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                     aria-haspopup="listbox"
                                     aria-expanded={isClientDropdownOpen}
                                 >
-                                    {saleData.clientId ? clients.find(c => c.id === saleData.clientId)?.fullName : <span className="text-gray-400">Escolha a cliente...</span>}
+                                    {clientId ? clients.find(c => c.id === clientId)?.fullName : <span className="text-gray-400">Escolha a cliente...</span>}
                                 </button>
                                 {isClientDropdownOpen && (
                                     <div className="absolute z-10 w-full mt-2 bg-white rounded-[24px] shadow-2xl border border-rose-100 max-h-60 overflow-y-auto animate-view-enter">
@@ -153,7 +203,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                                     onClick={() => handleClientSelect(c.id)}
                                                     className="px-6 py-3 hover:bg-rose-50 cursor-pointer rounded-xl transition-colors font-medium"
                                                     role="option"
-                                                    aria-selected={c.id === saleData.clientId}
+                                                    aria-selected={c.id === clientId}
                                                 >
                                                     {c.fullName}
                                                 </li>
@@ -171,95 +221,125 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             label="Data do Pedido 📅" 
                             name="saleDate" 
                             type="date" 
-                            value={saleData.saleDate} 
-                            onChange={handleChange}
+                            value={saleDate} 
+                            onChange={e => setSaleDate(e.target.value)}
                             className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <Input 
-                            label="Código (opcional) 🔢" 
-                            name="productCode" 
-                            type="number" 
-                            placeholder="Ex: 12345" 
-                            value={saleData.productCode} 
-                            onChange={handleChange}
-                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
-                        />
-                        <Input 
-                            label="Qual o produto? * 💄" 
-                            name="productName" 
-                            placeholder="Ex: Sabonete Tododia"
-                            value={saleData.productName} 
-                            onChange={handleChange} 
-                            required
-                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <Input 
-                            label="Quantos? 📦" 
-                            name="quantity" 
-                            type="number" 
-                            min="1" 
-                            value={saleData.quantity} 
-                            onChange={handleChange} 
-                            required
-                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
-                        />
-                        <div className="space-y-2">
-                            <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Valor Unitário 💸</label>
-                            <div className="relative">
-                                <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-xl">R$</span>
-                                <Input
-                                    label=""
-                                    name="unitPrice"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    value={saleData.unitPrice}
-                                    onChange={handleChange}
-                                    onFocus={(e) => e.target.value === '0' && setSaleData(prev => ({...prev, unitPrice: ''}))}
-                                    onBlur={(e) => e.target.value === '' && setSaleData(prev => ({...prev, unitPrice: '0'}))}
-                                    required
-                                    className="pl-16 text-xl font-black py-4 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Total</label>
-                            <div className="bg-emerald-50 rounded-[24px] p-4 flex items-center justify-center border-2 border-emerald-100 h-[62px]">
-                                <span className="text-2xl font-black text-emerald-600">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <Input 
-                        label="Algum detalhe? 📝" 
-                        name="observation" 
-                        placeholder="Ex: Entrega no sábado..."
-                        value={saleData.observation} 
-                        onChange={handleChange}
-                        className="text-xl py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
-                    />
-
-                    <div className="pt-6">
-                        <Button 
-                            type="submit" 
-                            disabled={!saleData.clientId || isSubmitting}
-                            className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
-                        >
-                            {isSubmitting ? (
-                                <div className="flex items-center justify-center gap-3">
-                                    <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    <span>Salvando...</span>
+                    <div className="space-y-6">
+                        {items.map((item, index) => (
+                            <div key={item.id} className="p-6 bg-rose-50/30 rounded-[32px] border-2 border-rose-50 relative animate-view-enter">
+                                {items.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveItem(index)}
+                                        className="absolute -top-3 -right-3 w-10 h-10 bg-white border-2 border-rose-100 text-rose-400 hover:text-rose-600 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90"
+                                        title="Remover produto"
+                                    >
+                                        <Trash2Icon className="w-5 h-5" />
+                                    </button>
+                                )}
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                    <Input 
+                                        label="Código (opcional) 🔢" 
+                                        placeholder="Ex: 123" 
+                                        value={item.productCode} 
+                                        onChange={e => handleItemChange(index, 'productCode', e.target.value)}
+                                        className="text-lg py-4 px-6 border-2 border-white focus:border-rose-300 rounded-[24px]"
+                                    />
+                                    <Input 
+                                        label="Qual o produto? * 💄" 
+                                        placeholder="Ex: Batom Matte"
+                                        value={item.productName} 
+                                        onChange={e => handleItemChange(index, 'productName', e.target.value)} 
+                                        required
+                                        className="text-lg py-4 px-6 border-2 border-white focus:border-rose-300 rounded-[24px]"
+                                    />
                                 </div>
-                            ) : (
-                                isEditing ? 'Atualizar Venda ✨' : 'Colocar no Caderninho ✨'
-                            )}
-                        </Button>
+
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                    <Input 
+                                        label="Quantos? 📦" 
+                                        type="number" 
+                                        min="1" 
+                                        value={item.quantity} 
+                                        onChange={e => handleItemChange(index, 'quantity', e.target.value)} 
+                                        required
+                                        className="text-lg py-4 px-6 border-2 border-white focus:border-rose-300 rounded-[24px]"
+                                    />
+                                    <div className="space-y-2">
+                                        <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Preço Cada 💸</label>
+                                        <div className="relative group">
+                                            <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-xl transition-colors group-focus-within:text-rose-500">R$</span>
+                                            <Input
+                                                label=""
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={item.unitPrice}
+                                                onChange={e => handleItemChange(index, 'unitPrice', e.target.value)}
+                                                onFocus={(e) => e.target.value === '0' && handleItemChange(index, 'unitPrice', '')}
+                                                onBlur={(e) => e.target.value === '' && handleItemChange(index, 'unitPrice', '0')}
+                                                required
+                                                className="pl-16 text-xl font-black py-4 border-2 border-rose-100 bg-rose-50/50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-200/50 rounded-[24px] transition-all"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="hidden md:flex flex-col justify-end">
+                                        <div className="bg-white/80 rounded-[24px] p-4 flex items-center justify-center border-2 border-rose-50 h-[62px]">
+                                            <span className="text-xl font-black text-emerald-600">
+                                                {((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+
+                        {!isEditing && (
+                            <button
+                                type="button"
+                                onClick={handleAddItem}
+                                className="w-full py-4 border-2 border-dashed border-rose-200 text-rose-500 font-black rounded-[24px] hover:bg-rose-50 hover:border-rose-300 transition-all flex items-center justify-center gap-2 group"
+                            >
+                                <PlusIcon className="w-5 h-5 group-hover:scale-125 transition-transform" />
+                                Adicionar mais um produto
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="space-y-6">
+                        <Input 
+                            label="Algum detalhe para todos? 📝" 
+                            placeholder="Ex: Entrega no sábado..."
+                            value={observation} 
+                            onChange={e => setObservation(e.target.value)}
+                            className="text-xl py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        />
+
+                        <div className="bg-emerald-500 rounded-[32px] p-6 text-white text-center shadow-lg shadow-emerald-200">
+                            <p className="text-xs font-black uppercase tracking-[0.2em] opacity-80 mb-1">Total Geral do Pedido</p>
+                            <p className="text-4xl font-black">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        </div>
+
+                        <div className="pt-2">
+                            <Button 
+                                type="submit" 
+                                disabled={!clientId || isSubmitting}
+                                className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
+                            >
+                                {isSubmitting ? (
+                                    <div className="flex items-center justify-center gap-3">
+                                        <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        <span>Salvando...</span>
+                                    </div>
+                                ) : (
+                                    isEditing ? 'Atualizar Venda ✨' : 'Colocar no Caderninho ✨'
+                                )}
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </Card>
