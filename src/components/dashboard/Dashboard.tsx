@@ -71,16 +71,6 @@ export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
                     </button>
 
                     <button 
-                         onClick={() => onNavigate('stock')}
-                        className="flex flex-col items-center justify-center p-4 md:p-5 bg-white border border-rose-50 rounded-[24px] md:rounded-[20px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
-                    >
-                        <div className="w-12 h-12 md:w-12 md:h-12 bg-pink-50 rounded-xl md:rounded-xl flex items-center justify-center mb-3 md:mb-4 group-hover:scale-110 transition-transform">
-                            <ArchiveIcon className="w-6 h-6 md:w-6 md:h-6 text-pink-500" />
-                        </div>
-                        <span className="font-bold text-gray-700 text-[10px] md:text-xs lg:text-sm">Estoque</span>
-                    </button>
-
-                    <button 
                         onClick={() => onNavigate('clients')}
                         className="flex flex-col items-center justify-center p-4 md:p-5 bg-white border border-rose-50 rounded-[24px] md:rounded-[20px] shadow-sm hover:shadow-md transition-all active:scale-95 group text-center"
                     >

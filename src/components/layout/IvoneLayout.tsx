@@ -4,7 +4,6 @@ import {
     UsersIcon, 
     ShoppingCartIcon, 
     CreditCardIcon, 
-    ArchiveIcon, 
     SettingsIcon, 
     LogOutIcon,
     ArrowLeftIcon,
