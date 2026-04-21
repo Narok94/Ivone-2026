@@ -22,20 +22,20 @@ export const HeaderSummary: FC<HeaderSummaryProps> = ({ setActiveView }) => {
     ];
 
     return (
-        <div className="p-2 md:p-4">
-             <div className="grid grid-cols-2 lg:flex lg:flex-wrap justify-center gap-2 md:gap-4 max-w-7xl mx-auto">
+        <div className="p-1 md:p-4">
+             <div className="grid grid-cols-2 lg:flex lg:flex-wrap justify-center gap-1.5 md:gap-4 max-w-7xl mx-auto">
                   {summaryItems.map(item => (
                      <div 
                          key={item.title} 
                          onClick={() => setActiveView(item.view as View)} 
-                         className={`p-4 md:p-6 flex flex-col items-start bg-gradient-to-br ${item.color} rounded-[32px] shadow-sm text-white cursor-pointer hover:shadow-xl active:scale-95 transition-all duration-300 min-h-[120px] md:min-w-[240px] md:flex-1 md:max-w-[300px]`}
+                         className={`p-3 md:p-6 flex flex-col items-start bg-gradient-to-br ${item.color} rounded-[24px] md:rounded-[32px] shadow-sm text-white cursor-pointer hover:shadow-xl active:scale-95 transition-all duration-300 min-h-[90px] md:min-h-[120px] md:min-w-[240px] md:flex-1 md:max-w-[300px]`}
                      >
-                         <div className="p-2.5 md:p-3 rounded-2xl mb-3 bg-white/20 backdrop-blur-sm self-start">
-                             <item.icon className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                         <div className="p-2 md:p-3 rounded-xl md:rounded-2xl mb-1.5 md:mb-3 bg-white/20 backdrop-blur-sm self-start">
+                             <item.icon className="w-4 h-4 md:w-6 md:h-6 text-white" />
                          </div>
                          <div className="w-full">
-                             <p className="text-[9px] md:text-[10px] font-black opacity-80 uppercase tracking-widest leading-none mb-1.5">{item.title}</p>
-                             <p className="text-sm md:text-xl font-black truncate">{item.value}</p>
+                             <p className="text-[8px] md:text-[10px] font-black opacity-80 uppercase tracking-widest leading-none mb-1 md:mb-1.5">{item.title}</p>
+                             <p className="text-xs md:text-xl font-black truncate">{item.value}</p>
                          </div>
                      </div>
                   ))}

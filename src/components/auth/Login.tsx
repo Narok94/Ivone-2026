@@ -38,46 +38,26 @@ export const Login: FC = () => {
     const rings = Array.from({ length: 18 });
 
     return (
-        <div className="w-full max-w-sm mx-auto overflow-hidden shadow-2xl rounded-3xl bg-[#FFF9FB] flex flex-col relative border-4 border-rose-200 paper-texture animate-modal-scale-in">
-            {/* iOS Status Bar Mockup */}
-            <div className="flex justify-between items-center px-6 py-2 text-rose-800 text-xs font-bold bg-white/50 backdrop-blur-sm z-10">
-                <span>09:59</span>
-                <div className="flex gap-1.5 items-center">
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21L1 10h11v11zm1-11v11l11-11H13z"/></svg> {/* Signal Icon */}
-                    <span className="text-[10px]">4G</span>
-                    <div className="w-6 h-3 border border-rose-800 rounded-[2px] relative">
-                         <div className="absolute left-0 top-0 bottom-0 bg-rose-800 w-[47%]" />
-                         <div className="absolute right-[-2px] top-[2px] w-0.5 h-1.5 bg-rose-800 rounded-r-full" />
+        <div className="min-h-screen w-full flex items-center justify-center bg-[#FFF9FB] p-6 lg:p-8 overflow-hidden relative">
+            {/* Background decorative elements for mobile flair */}
+            <div className="absolute top-[-5%] right-[-10%] w-72 h-72 bg-pink-100/40 rounded-full blur-3xl -z-10 animate-blob" />
+            <div className="absolute bottom-[-5%] left-[-10%] w-96 h-96 bg-rose-100/40 rounded-full blur-3xl -z-10 animate-blob animation-delay-2000" />
+
+            <div className="w-full max-w-sm overflow-hidden shadow-[0_32px_64px_-15px_rgba(233,30,99,0.2)] rounded-[3rem] bg-white flex flex-col relative border-[8px] border-white paper-texture animate-modal-scale-in">
+                {/* Notebook Content Area */}
+                <div className="relative flex-1 notebook-page px-8 pl-14 pt-20 pb-12">
+                    {/* Spiral Rings */}
+                    <div className="notebook-spiral-container !left-[-24px] !width-[48px]">
+                        {rings.map((_, i) => (
+                            <div key={i} className="notebook-ring !h-[12px] !w-[48px]" />
+                        ))}
                     </div>
-                </div>
-            </div>
 
-            {/* Top Gradient */}
-            <div className="h-24 bg-gradient-to-r from-rose-500 via-pink-600 to-purple-800 flex items-center justify-center relative overlow-hidden">
-                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/notebook.png')]" />
-                <h1 className="text-white text-center font-black text-sm uppercase tracking-[0.2em] px-4 drop-shadow-md z-10">
-                    IVONE-2026: CADERNINHO DIGITAL DE VENDAS
-                </h1>
-            </div>
-
-            {/* Notebook Content Area */}
-            <div className="relative flex-1 notebook-page p-6 pl-10">
-                {/* Spiral Rings */}
-                <div className="notebook-spiral-container">
-                    {rings.map((_, i) => (
-                        <div key={i} className="notebook-ring" />
-                    ))}
-                </div>
-
-                {/* Header */}
-                <div className="flex flex-col items-center mt-4">
-                    <div className="w-16 h-16 bg-pink-100/80 rounded-2xl flex items-center justify-center mb-6 shadow-sm border border-pink-200">
-                        <InfinityIcon className="w-10 h-10 text-pink-600" />
+                    {/* Header */}
+                    <div className="flex flex-col items-center mt-2">
+                        <h2 className="text-3xl font-black text-gray-900 mb-2">Olá, Ivone! 🌸</h2>
+                        <p className="text-pink-500 font-bold mb-12">Seu caderninho digital está pronto.</p>
                     </div>
-                    
-                    <h2 className="text-3xl font-black text-gray-900 mb-1">Olá, Ivone! 🌸</h2>
-                    <p className="text-pink-500 font-bold mb-8">Seu caderninho digital está pronto.</p>
-                </div>
 
                 {/* Instructions */}
                 <div className="mb-8">
@@ -133,33 +113,6 @@ export const Login: FC = () => {
                         O SEU CADERNINHO DIGITAL INTELIGENTE DE VENDAS
                     </p>
                 </div>
-            </div>
-
-            {/* AI Studio / Browser Mockup Controls */}
-            <div className="bg-gray-100 p-2 border-t border-gray-200">
-                <div className="flex items-center justify-between px-4 mb-2">
-                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    </button>
-                    <div className="bg-gray-200 px-6 py-1 rounded-full text-xs font-bold text-gray-600">
-                        Preview
-                    </div>
-                    <button className="text-gray-400 hover:text-gray-600 transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
-                    </button>
-                </div>
-                
-                {/* Safari style URL bar */}
-                <div className="bg-white/80 rounded-xl p-2 flex items-center justify-between shadow-inner border border-gray-200">
-                     <button className="text-gray-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                    </button>
-                    <div className="text-[10px] font-medium text-gray-400">
-                        aistudio.google.com
-                    </div>
-                    <button className="text-gray-400">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
-                    </button>
                 </div>
             </div>
         </div>

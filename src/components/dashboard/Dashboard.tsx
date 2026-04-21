@@ -16,41 +16,41 @@ interface DashboardProps {
 
 export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
     return (
-        <div className="space-y-10 animate-view-enter">
+        <div className="space-y-6 md:space-y-10 animate-view-enter">
             {/* Header / Intro */}
             <div className="flex justify-between items-end">
                 <div>
-                    <h2 className="text-2xl font-black text-rose-900 mb-2">Ações Rápidas</h2>
-                    <p className="text-gray-500 font-medium">O que vamos registrar hoje?</p>
+                    <h2 className="text-xl md:text-2xl font-black text-rose-900 mb-1 md:mb-2">Ações Rápidas</h2>
+                    <p className="text-xs md:text-base text-gray-500 font-medium">O que vamos registrar hoje?</p>
                 </div>
             </div>
             
             {/* Ações Rápidas */}
             <section>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 mt-2 md:mt-6">
                     <button 
                         onClick={() => onNavigate('add_sale')}
-                        className="flex items-center gap-6 p-6 md:p-8 bg-rose-50 border-2 border-rose-100 rounded-[32px] hover:shadow-xl hover:shadow-rose-100/50 transition-all group active:scale-[0.98] text-left"
+                        className="flex items-center gap-4 md:gap-6 p-4 md:p-8 bg-rose-50 border-2 border-rose-100 rounded-[28px] md:rounded-[32px] hover:shadow-xl hover:shadow-rose-100/50 transition-all group active:scale-[0.98] text-left"
                     >
-                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                            <ShoppingCartIcon className="w-8 h-8 text-rose-500" />
+                        <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                            <ShoppingCartIcon className="w-6 h-6 md:w-8 md:h-8 text-rose-500" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-rose-900">Nova Venda</h3>
-                            <p className="text-rose-400 font-medium">Registrar uma nova venda.</p>
+                            <h3 className="text-lg md:text-xl font-black text-rose-900">Nova Venda</h3>
+                            <p className="text-[10px] md:text-base text-rose-400 font-medium">Registrar uma nova venda.</p>
                         </div>
                     </button>
 
                     <button 
                         onClick={() => onNavigate('add_payment')}
-                        className="flex items-center gap-6 p-6 md:p-8 bg-emerald-50 border-2 border-emerald-100 rounded-[32px] hover:shadow-xl hover:shadow-emerald-100/50 transition-all group active:scale-[0.98] text-left"
+                        className="flex items-center gap-4 md:gap-6 p-4 md:p-8 bg-emerald-50 border-2 border-emerald-100 rounded-[28px] md:rounded-[32px] hover:shadow-xl hover:shadow-emerald-100/50 transition-all group active:scale-[0.98] text-left"
                     >
-                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                            <CreditCardIcon className="w-8 h-8 text-emerald-500" />
+                        <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-xl md:rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                            <CreditCardIcon className="w-6 h-6 md:w-8 md:h-8 text-emerald-500" />
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-emerald-900">Receber Pagamento</h3>
-                            <p className="text-emerald-400 font-medium">Registrar um pagamento.</p>
+                            <h3 className="text-lg md:text-xl font-black text-emerald-900">Receber Pagamento</h3>
+                            <p className="text-[10px] md:text-base text-emerald-400 font-medium">Registrar um pagamento.</p>
                         </div>
                     </button>
                 </div>

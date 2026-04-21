@@ -34,9 +34,19 @@ async function decodeAudioData(
   return buffer;
 }
 
-export const AIAssistant: FC<{ onNavigate: (view: View) => void; showToast: (message: string) => void }> = ({ onNavigate, showToast }) => {
+export const AIAssistant: FC<{ 
+    onNavigate: (view: View) => void; 
+    showToast: (message: string) => void;
+    externalOpen?: boolean;
+    setExternalOpen?: (open: boolean) => void;
+}> = ({ onNavigate, showToast, externalOpen, setExternalOpen }) => {
     const { addClient, addSale, addPayment, clients } = useData();
-    const [isOpen, setIsOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
+    
+    // Sync with external control if provided
+    const isOpen = externalOpen !== undefined ? externalOpen : internalOpen;
+    const setIsOpen = setExternalOpen || setInternalOpen;
+
     const [messages, setMessages] = useState<{ sender: 'user' | 'ai'; text: string | ReactNode }[]>([]);
     const [userInput, setUserInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -475,7 +485,7 @@ IMPORTANTE: Não adicione texto antes ou depois do JSON se estiver executando um
                 onTouchStart={handleTouchStart}
                 onClick={handleOrbClick}
                 style={{ left: position.x, top: position.y }}
-                className={`fixed z-50 w-16 h-16 rounded-full cursor-pointer flex items-center justify-center shadow-2xl transition-transform duration-300 hover:scale-110 active:scale-95 ${isDragging ? 'scale-110' : ''} ${isOpen ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-pink-400 to-rose-500 animate-pulse-glow'}`}
+                className={`fixed z-50 w-16 h-16 rounded-full cursor-pointer hidden md:flex items-center justify-center shadow-2xl transition-transform duration-300 hover:scale-110 active:scale-95 ${isDragging ? 'scale-110' : ''} ${isOpen ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-pink-400 to-rose-500 animate-pulse-glow'}`}
             >
                 {isOpen ? (
                     <span className="text-white text-2xl font-bold">&times;</span>
