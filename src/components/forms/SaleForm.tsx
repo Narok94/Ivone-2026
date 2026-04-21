@@ -168,9 +168,9 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                 {isEditing ? 'Editar Venda' : 'Nova Venda'} 🛍️
             </h1>
 
-            <Card className="p-6 md:p-10 border-rose-100 shadow-xl shadow-rose-200/20">
-                <form onSubmit={handleSubmit} className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <Card className="p-4 md:p-10 border-rose-100 shadow-xl shadow-rose-200/20">
+                <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                         <div ref={clientSelectRef} className="space-y-2">
                             <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Quem comprou? * 👤</label>
                             <div className="relative">
@@ -178,7 +178,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                     type="button"
                                     id="client-select-button"
                                     onClick={() => setIsClientDropdownOpen(prev => !prev)}
-                                    className="w-full px-6 py-4 text-left bg-white border-2 border-rose-50 rounded-[24px] shadow-sm focus:outline-none focus:border-rose-300 transition-all font-medium text-lg"
+                                    className="w-full px-5 py-3 md:px-6 md:py-4 text-left bg-white border-2 border-rose-50 rounded-[20px] md:rounded-[24px] shadow-sm focus:outline-none focus:border-rose-300 transition-all font-medium text-base md:text-lg"
                                     aria-haspopup="listbox"
                                     aria-expanded={isClientDropdownOpen}
                                 >
@@ -223,31 +223,31 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             type="date" 
                             value={saleDate} 
                             onChange={e => setSaleDate(e.target.value)}
-                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                            className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                         />
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4 md:space-y-6">
                         {items.map((item, index) => (
-                            <div key={item.id} className="p-6 bg-rose-50/30 rounded-[32px] border-2 border-rose-50 relative animate-view-enter">
+                            <div key={item.id} className="p-4 md:p-6 bg-rose-50/30 rounded-[24px] md:rounded-[32px] border-2 border-rose-50 relative animate-view-enter">
                                 {items.length > 1 && (
                                     <button
                                         type="button"
                                         onClick={() => handleRemoveItem(index)}
-                                        className="absolute -top-3 -right-3 w-10 h-10 bg-white border-2 border-rose-100 text-rose-400 hover:text-rose-600 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90"
+                                        className="absolute -top-2 -right-2 md:-top-3 md:-right-3 w-8 h-8 md:w-10 md:h-10 bg-white border-2 border-rose-100 text-rose-400 hover:text-rose-600 rounded-full flex items-center justify-center shadow-md transition-all active:scale-90"
                                         title="Remover produto"
                                     >
-                                        <Trash2Icon className="w-5 h-5" />
+                                        <Trash2Icon className="w-4 h-4 md:w-5 md:h-5" />
                                     </button>
                                 )}
                                 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
                                     <Input 
                                         label="Código (opcional) 🔢" 
                                         placeholder="Ex: 123" 
                                         value={item.productCode} 
                                         onChange={e => handleItemChange(index, 'productCode', e.target.value)}
-                                        className="text-lg py-4 px-6 border-2 border-white focus:border-rose-300 rounded-[24px]"
+                                        className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                     <Input 
                                         label="Qual o produto? * 💄" 
@@ -255,11 +255,11 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         value={item.productName} 
                                         onChange={e => handleItemChange(index, 'productName', e.target.value)} 
                                         required
-                                        className="text-lg py-4 px-6 border-2 border-white focus:border-rose-300 rounded-[24px]"
+                                        className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
                                     <Input 
                                         label="Quantos? 📦" 
                                         type="number" 
@@ -267,12 +267,12 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         value={item.quantity} 
                                         onChange={e => handleItemChange(index, 'quantity', e.target.value)} 
                                         required
-                                        className="text-lg py-4 px-6 border-2 border-white focus:border-rose-300 rounded-[24px]"
+                                        className="text-base md:text-lg py-3 md:py-4 px-5 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
-                                    <div className="space-y-2">
-                                        <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Preço Cada 💸</label>
+                                    <div className="space-y-1 md:space-y-2">
+                                        <label className="block text-[10px] md:text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Preço Cada 💸</label>
                                         <div className="relative group">
-                                            <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-xl transition-colors group-focus-within:text-rose-500">R$</span>
+                                            <span className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-sm md:text-xl transition-colors group-focus-within:text-rose-500">R$</span>
                                             <Input
                                                 label=""
                                                 type="number"
@@ -283,7 +283,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                                 onFocus={(e) => e.target.value === '0' && handleItemChange(index, 'unitPrice', '')}
                                                 onBlur={(e) => e.target.value === '' && handleItemChange(index, 'unitPrice', '0')}
                                                 required
-                                                className="pl-16 text-xl font-black py-4 border-2 border-rose-100 bg-rose-50/50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-200/50 rounded-[24px] transition-all"
+                                                className="pl-9 md:pl-16 text-base md:text-xl font-black py-3 md:py-4 border-2 border-rose-100 bg-rose-50/50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-200/50 rounded-[20px] md:rounded-[24px] transition-all"
                                             />
                                         </div>
                                     </div>
@@ -302,33 +302,33 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             <button
                                 type="button"
                                 onClick={handleAddItem}
-                                className="w-full py-4 border-2 border-dashed border-rose-200 text-rose-500 font-black rounded-[24px] hover:bg-rose-50 hover:border-rose-300 transition-all flex items-center justify-center gap-2 group"
+                                className="w-full py-3 md:py-4 border-2 border-dashed border-rose-200 text-rose-500 font-black rounded-2xl md:rounded-[24px] hover:bg-rose-50 hover:border-rose-300 transition-all flex items-center justify-center gap-2 group"
                             >
-                                <PlusIcon className="w-5 h-5 group-hover:scale-125 transition-transform" />
+                                <PlusIcon className="w-4 h-4 md:w-5 md:h-5 group-hover:scale-125 transition-transform" />
                                 Adicionar mais um produto
                             </button>
                         )}
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-4 md:space-y-6">
                         <Input 
                             label="Algum detalhe para todos? 📝" 
                             placeholder="Ex: Entrega no sábado..."
                             value={observation} 
                             onChange={e => setObservation(e.target.value)}
-                            className="text-xl py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                            className="text-base md:text-xl py-3 md:py-4 px-5 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                         />
 
-                        <div className="bg-emerald-500 rounded-[32px] p-6 text-white text-center shadow-lg shadow-emerald-200">
-                            <p className="text-xs font-black uppercase tracking-[0.2em] opacity-80 mb-1">Total Geral do Pedido</p>
-                            <p className="text-4xl font-black">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+                        <div className="bg-emerald-500 rounded-[24px] md:rounded-[32px] p-4 md:p-6 text-white text-center shadow-lg shadow-emerald-200">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mb-1">Total Geral do Pedido</p>
+                            <p className="text-2xl md:text-4xl font-black">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                         </div>
 
                         <div className="pt-2">
                             <Button 
                                 type="submit" 
                                 disabled={!clientId || isSubmitting}
-                                className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
+                                className="w-full py-4 md:py-6 text-lg md:text-xl rounded-[24px] md:rounded-[32px] shadow-lg shadow-rose-200"
                             >
                                 {isSubmitting ? (
                                     <div className="flex items-center justify-center gap-3">
