@@ -38,18 +38,19 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 {/* Notebook Background effect for the whole center */}
                 <div className="absolute inset-0 bg-[#fdfdfd] shadow-2xl rounded-[2.5rem] paper-texture -z-10 border border-gray-300" />
                 
-                {/* Centered Greeting Header */}
-                <header className="py-6 md:py-8 text-center relative px-16">
-                    <div className="flex flex-col items-center gap-2 mb-2">
+                {/* Header with Logo at Top Left */}
+                <header className="py-6 md:py-8 relative min-h-[100px] md:min-h-[140px] flex items-center justify-center">
+                    <div className="absolute left-0 top-2 md:top-4">
                         <img 
                             src="/logo-ivone.png" 
                             alt="Logo Ivone" 
-                            className="h-[50px] w-auto drop-shadow-[0_2px_4px_rgba(233,30,99,0.15)] object-contain"
+                            className="h-[70px] md:h-[120px] w-auto drop-shadow-[0_4px_10px_rgba(233,30,99,0.15)] object-contain"
                         />
-                        <h1 className="text-lg md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-2">
-                            Olá, Ivone! 💘
-                        </h1>
                     </div>
+                    
+                    <h1 className="text-2xl md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-2">
+                        Olá, Ivone! 💘
+                    </h1>
                     
                     {/* Navigation Actions */}
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
