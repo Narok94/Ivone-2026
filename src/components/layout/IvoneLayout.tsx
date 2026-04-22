@@ -48,8 +48,13 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                         />
                     </div>
                     
-                    <h1 className="text-2xl md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-2">
-                        Olá, Ivone! 💘
+                    <h1 className="text-2xl md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-3">
+                        Olá, Ivone!
+                        <img 
+                            src="/logo-ivone.png" 
+                            alt="" 
+                            className="h-[30px] md:h-[50px] w-auto drop-shadow-sm object-contain inline-block"
+                        />
                     </h1>
                     
                     {/* Navigation Actions */}
