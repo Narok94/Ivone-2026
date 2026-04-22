@@ -8,7 +8,7 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, className = '', onClick }) => (
   <div 
-    className={`bg-white/60 backdrop-blur-md rounded-3xl shadow-md border border-pink-100 p-6 transition-all duration-300 ${className} ${onClick ? 'cursor-pointer hover:shadow-xl hover:-translate-y-1' : ''}`}
+    className={`bg-white rounded-[32px] shadow-[0_8px_30px_rgba(233,30,99,0.06)] border border-rose-50/50 p-6 transition-all duration-300 ${className} ${onClick ? 'cursor-pointer hover:shadow-[0_20px_40px_rgba(233,30,99,0.12)] hover:-translate-y-1' : ''}`}
     onClick={onClick}
   >
     {children}
@@ -21,11 +21,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ children, className = '', variant = 'primary', ...props }) => {
-  const baseClasses = 'py-2 px-5 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 transform';
+  const baseClasses = 'py-2 px-5 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 transform active:scale-95';
   const variantClasses = {
-    primary: 'bg-gradient-to-br from-pink-500 to-rose-500 text-white font-bold shadow-md hover:shadow-lg hover:-translate-y-0.5 focus:ring-rose-400',
-    secondary: 'bg-pink-100 text-pink-700 hover:bg-pink-200 focus:ring-pink-500 font-semibold',
-    danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500 font-semibold shadow-md hover:shadow-lg',
+    primary: 'bg-gradient-to-br from-[#e91e63] to-[#c2185b] text-white font-black shadow-[0_8px_20px_rgba(233,30,99,0.25)] hover:shadow-[0_12px_25px_rgba(233,30,99,0.35)] hover:-translate-y-0.5 focus:ring-[#e91e63]',
+    secondary: 'bg-rose-50 text-[#e91e63] hover:bg-rose-100 focus:ring-[#e91e63] font-black border border-rose-100/50',
+    danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500 font-black shadow-md hover:shadow-lg',
   };
 
   return (
@@ -40,11 +40,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input: React.FC<InputProps> = ({ label, id, ...props }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+  <div className="space-y-1.5">
+    <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>
     <input
       id={id}
-      className="w-full px-4 py-2 bg-white/70 border border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition-shadow text-gray-900"
+      className="w-full px-5 py-3 bg-white border-2 border-rose-50 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-900 font-medium"
       {...props}
     />
   </div>
@@ -55,12 +55,12 @@ interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 export const TextArea: React.FC<TextAreaProps> = ({ label, id, ...props }) => (
-  <div>
-    <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+  <div className="space-y-1.5">
+    <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>
     <textarea
       id={id}
       rows={3}
-      className="w-full px-4 py-2 bg-white/70 border border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition-shadow"
+      className="w-full px-5 py-3 bg-white border-2 border-rose-50 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-800 font-medium"
       {...props}
     ></textarea>
   </div>
@@ -72,11 +72,11 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select: React.FC<SelectProps> = ({ label, id, children, ...props }) => (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    <div className="space-y-1.5">
+      <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>
       <select
         id={id}
-        className="w-full px-4 py-2 border bg-white/70 border-gray-300 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-pink-400 focus:border-pink-400 transition-shadow"
+        className="w-full px-5 py-3 border-2 bg-white border-rose-50 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all font-medium"
         {...props}
       >
         {children}

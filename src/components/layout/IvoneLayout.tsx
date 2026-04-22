@@ -84,7 +84,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
             </div>
 
             {/* Mobile Bottom Navigation (Always present for utility) */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-pink-100 flex items-center justify-around px-2 py-3 pb-[calc(10px+env(safe-area-inset-bottom))] z-40 shadow-[0_-8px_30px_rgba(233,30,99,0.08)]">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 glass-menu flex items-center justify-around px-2 py-3 pb-[calc(10px+env(safe-area-inset-bottom))] z-40">
                 {mobileNavItems.map(item => (
                     <button
                         key={item.id}
