@@ -46,7 +46,6 @@ export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
                         </div>
                         <div>
                             <h3 className="text-lg md:text-xl font-black text-rose-900">Nova Venda</h3>
-                            <p className="text-[10px] md:text-sm text-rose-400 font-bold uppercase tracking-wider italic">Registrar agora</p>
                         </div>
                     </motion.button>
 
@@ -63,7 +62,6 @@ export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
                         </div>
                         <div>
                             <h3 className="text-lg md:text-xl font-black text-emerald-900">Receber Pagamento</h3>
-                            <p className="text-[10px] md:text-sm text-emerald-400 font-bold uppercase tracking-wider italic">Lançar valor</p>
                         </div>
                     </motion.button>
                 </div>
