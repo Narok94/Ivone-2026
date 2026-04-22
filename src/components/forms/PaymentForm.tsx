@@ -94,7 +94,7 @@ export const PaymentForm: FC<{
                         value={paymentData.clientId} 
                         onChange={handleChange} 
                         disabled={isEditing}
-                        className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        className="text-lg py-4 px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[24px]"
                     >
                         <option value="">Selecione uma cliente</option>
                         {clients.map(c => <option key={c.id} value={c.id}>{c.fullName}</option>)}
@@ -118,7 +118,7 @@ export const PaymentForm: FC<{
                             type="date" 
                             value={paymentData.paymentDate} 
                             onChange={handleChange}
-                            className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                            className="text-lg py-4 px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[24px]"
                         />
                         <div className="space-y-2">
                             <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Quanto ela deu? 💸</label>
@@ -135,7 +135,7 @@ export const PaymentForm: FC<{
                                     onFocus={(e) => e.target.value === '0' && setPaymentData(prev => ({...prev, amount: ''}))}
                                     onBlur={(e) => e.target.value === '' && setPaymentData(prev => ({...prev, amount: '0'}))}
                                     required
-                                    className="pl-16 text-2xl font-black py-4 border-2 border-rose-50 focus:border-rose-300 rounded-[24px] text-rose-600"
+                                    className="pl-16 text-2xl font-black py-4 border-2 border-rose-100 bg-white focus:border-[#e91e63] rounded-[24px] text-rose-600"
                                 />
                             </div>
                         </div>
@@ -147,7 +147,7 @@ export const PaymentForm: FC<{
                         placeholder="Ex: Pagou no Pix, deixou para depois..."
                         value={paymentData.observation} 
                         onChange={handleChange}
-                        className="text-lg py-4 px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[24px]"
+                        className="text-lg py-4 px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[24px]"
                     />
 
                     <div className="pt-6">

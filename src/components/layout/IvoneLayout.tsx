@@ -6,13 +6,11 @@ import {
     CreditCardIcon, 
     SettingsIcon, 
     LogOutIcon,
-    ArrowLeftIcon,
-    BotMessageSquareIcon
+    ArrowLeftIcon
 } from '../ui';
 import { HeaderSummary } from './HeaderSummary';
 import { Toast } from '../ui';
 import { View } from '../../types';
-import { AIAssistant } from '../ai/AIAssistant';
 import { useData } from '../../contexto/DataContext';
 
 interface IvoneLayoutProps {
@@ -26,14 +24,12 @@ interface IvoneLayoutProps {
 
 export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, onBack, toast, setToast }) => {
     const { logout } = useData();
-    const [isAIOpen, setIsAIOpen] = useState(false);
 
     const mobileNavItems = [
         { id: 'dashboard', icon: HomeIcon, label: 'Início' },
         { id: 'clients', icon: UsersIcon, label: 'Clientes' },
         { id: 'sales_view', icon: ShoppingCartIcon, label: 'Encomendas' },
         { id: 'all_payments', icon: CreditCardIcon, label: 'Pagos' },
-        { id: 'ai', icon: BotMessageSquareIcon, label: 'IA' },
     ];
 
     return (
@@ -43,10 +39,17 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 <div className="absolute inset-0 bg-[#fdfdfd] shadow-2xl rounded-[2.5rem] paper-texture -z-10 border border-gray-300" />
                 
                 {/* Centered Greeting Header */}
-                <header className="py-6 md:py-10 text-center relative px-16">
-                    <h1 className="text-lg md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-2">
-                        Olá, Ivone! 💘
-                    </h1>
+                <header className="py-6 md:py-8 text-center relative px-16">
+                    <div className="flex flex-col items-center gap-2 mb-2">
+                        <img 
+                            src="/logo-ivone.PNG" 
+                            alt="Logo Ivone" 
+                            className="h-[50px] w-auto drop-shadow-[0_2px_4px_rgba(233,30,99,0.15)] object-contain"
+                        />
+                        <h1 className="text-lg md:text-5xl font-black text-[#e91e63] flex items-center justify-center gap-2">
+                            Olá, Ivone! 💘
+                        </h1>
+                    </div>
                     
                     {/* Navigation Actions */}
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
@@ -87,24 +90,13 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 {mobileNavItems.map(item => (
                     <button
                         key={item.id}
-                        onClick={() => {
-                            if (item.id === 'ai') {
-                                setIsAIOpen(!isAIOpen);
-                            } else {
-                                setActiveView(item.id as View);
-                                setIsAIOpen(false);
-                            }
-                        }}
+                        onClick={() => setActiveView(item.id as View)}
                         className={`flex flex-col items-center gap-1 transition-all active:scale-95 ${
-                            (activeView === item.id && !isAIOpen) || (item.id === 'ai' && isAIOpen)
-                                ? 'text-[#e91e63]' 
-                                : 'text-gray-400'
+                            activeView === item.id ? 'text-[#e91e63]' : 'text-gray-400'
                         }`}
                     >
                         <div className={`p-2 rounded-xl transition-all duration-300 ${
-                            (activeView === item.id && !isAIOpen) || (item.id === 'ai' && isAIOpen)
-                                ? 'bg-pink-100/50 scale-110' 
-                                : 'hover:bg-gray-50'
+                            activeView === item.id ? 'bg-pink-100/50 scale-110' : 'hover:bg-gray-50'
                         }`}>
                             <item.icon className="w-5 h-5" />
                         </div>
@@ -123,17 +115,6 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
 
             {/* Toast Notifications */}
             {toast && <Toast message={toast} onClose={() => setToast(null)} />}
-
-            {/* AI Assistant Orb (Desktop) / Modal Control */}
-            <AIAssistant 
-                onNavigate={(v) => {
-                    setActiveView(v);
-                    setIsAIOpen(false);
-                }} 
-                showToast={setToast}
-                externalOpen={isAIOpen}
-                setExternalOpen={setIsAIOpen}
-            />
         </div>
     );
 };

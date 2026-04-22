@@ -48,7 +48,16 @@ export const Login: FC = () => {
                 </div>
 
                 {/* Content Area */}
-                <div className="relative flex-1 px-8 pl-12 pt-16 pb-12 text-center">
+                <div className="relative flex-1 px-8 pl-12 pt-12 pb-12 text-center">
+                    {/* Logo Section */}
+                    <div className="mb-6 flex justify-center">
+                        <img 
+                            src="/logo-ivone.PNG" 
+                            alt="Ivone Logo" 
+                            className="w-[200px] h-auto drop-shadow-[0_4px_6px_rgba(233,30,99,0.2)] object-contain"
+                        />
+                    </div>
+
                     {/* Greeting */}
                     <div className="mb-8">
                         <h2 className="text-4xl font-black text-[#1a1a1b] mb-1">Olá, Ivone! 🌸</h2>

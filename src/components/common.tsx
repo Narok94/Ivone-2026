@@ -44,7 +44,7 @@ export const Input: React.FC<InputProps> = ({ label, id, className = '', ...prop
     {label && <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>}
     <input
       id={id}
-      className={`w-full px-5 py-3 bg-white border-2 border-rose-100 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-900 font-medium placeholder:text-gray-300 ${className}`}
+      className={`w-full px-5 py-3 bg-white border-2 border-rose-100 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-200/20 hover:border-rose-200 transition-all text-gray-900 font-medium placeholder:text-gray-300 ${className}`}
       {...props}
     />
   </div>

@@ -229,7 +229,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
 
                     <div className="space-y-4 md:space-y-6">
                         {items.map((item, index) => (
-                            <div key={item.id} className="p-3 md:p-6 bg-rose-50/30 rounded-[20px] md:rounded-[32px] border-2 border-rose-50 relative animate-view-enter">
+                            <div key={item.id} className="p-4 md:p-8 bg-white/50 rounded-[24px] md:rounded-[40px] border-2 border-rose-100 shadow-[0_10px_30px_-10px_rgba(233,30,99,0.1)] relative animate-view-enter">
                                 {items.length > 1 && (
                                     <button
                                         type="button"
