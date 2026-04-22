@@ -117,7 +117,7 @@ const App: FC = () => {
                             prefilledClientId={selectedClientId}
                             onSaleSuccess={() => {
                                 setEditingSale(null);
-                                navigate('sales_view');
+                                navigate('dashboard');
                                 showToast(editingSale ? 'Venda atualizada!' : 'Venda registrada!');
                             }} 
                         />
@@ -128,7 +128,7 @@ const App: FC = () => {
                             prefilledClientId={selectedClientId}
                             onPaymentSuccess={() => {
                                 setEditingPayment(null);
-                                navigate('all_payments');
+                                navigate('dashboard');
                                 showToast(editingPayment ? 'Pagamento atualizado!' : 'Pagamento recebido!');
                             }}
                         />

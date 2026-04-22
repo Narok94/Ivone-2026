@@ -32,12 +32,51 @@ body {
 }
 
 .paper-texture {
-    background-color: #FFF9FB;
-    background-image: 
-        linear-gradient(rgba(233, 30, 99, 0.03) 1px, transparent 1px),
-        url("https://www.transparenttextures.com/patterns/white-paper.png");
-    background-size: 100% 1.5rem, auto;
-    background-attachment: local;
+    background-color: #fff;
+    background-image: linear-gradient(rgba(233, 30, 99, 0.05) 1px, transparent 1px);
+    background-size: 100% 2.5rem;
+}
+
+/* Notebook Page & Spiral Styles */
+.notebook-page {
+    position: relative;
+    background: white;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.notebook-spiral-container {
+    position: absolute;
+    left: 8px;
+    top: 20px;
+    bottom: 20px;
+    width: 30px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    z-index: 20;
+}
+
+.notebook-ring {
+    height: 12px;
+    width: 34px;
+    background: linear-gradient(to bottom, #d1d5db 0%, #9ca3af 50%, #4b5563 50%, #374151 100%);
+    border-radius: 6px;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    position: relative;
+    left: -17px;
+}
+
+.notebook-ring::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    background: #111;
+    border-radius: 50%;
+    opacity: 0.3;
 }
 
 @keyframes shimmer {

@@ -40,7 +40,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
         <div className="min-h-screen bg-[#FFF9FB] flex flex-col pb-20 md:pb-10">
             <div className="max-w-7xl mx-auto w-full px-4 md:px-8 relative pt-4 md:pt-0">
                 {/* Notebook Background effect for the whole center */}
-                <div className="absolute inset-0 bg-white shadow-xl rounded-[2rem] paper-texture -z-10 border border-pink-100" />
+                <div className="absolute inset-0 bg-[#fdfdfd] shadow-2xl rounded-[2.5rem] paper-texture -z-10 border border-gray-300" />
                 
                 {/* Centered Greeting Header */}
                 <header className="py-6 md:py-10 text-center relative px-16">
@@ -48,29 +48,28 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                         Olá, Ivone! 💘
                     </h1>
                     
-                    {/* Navigation Actions - Top Right */}
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        {activeView !== 'dashboard' && (
+                    {/* Navigation Actions */}
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                        {activeView === 'dashboard' ? (
+                            <div className="flex items-center gap-1">
+                                <button 
+                                    onClick={logout}
+                                    className="p-2.5 text-gray-400 hover:text-[#e91e63] transition-all active:scale-90 flex items-center gap-2 bg-white rounded-full shadow-sm border border-gray-100"
+                                    title="Sair do Caderninho"
+                                >
+                                    <LogOutIcon className="w-5 h-5" />
+                                    <span className="hidden md:block text-[10px] font-black uppercase tracking-widest text-gray-400">Sair</span>
+                                </button>
+                            </div>
+                        ) : (
                             <button 
                                 onClick={onBack}
-                                className="p-2.5 bg-white border border-pink-100 text-[#e91e63] rounded-full shadow-sm active:scale-90 transition-all"
+                                className="p-2.5 bg-white border border-pink-100 text-[#e91e63] rounded-full shadow-md active:scale-95 transition-all hover:bg-pink-50"
                                 title="Voltar"
                             >
-                                <ArrowLeftIcon className="w-5 h-5" />
+                                <ArrowLeftIcon className="w-5 h-5 md:w-6 md:h-6" />
                             </button>
                         )}
-                        
-                        <button 
-                            onClick={logout}
-                            className="p-2.5 text-gray-300 hover:text-[#e91e63] transition-all active:scale-90"
-                            title="Sair do Caderninho"
-                        >
-                            <LogOutIcon className="w-5 h-5 md:w-6 md:h-6" />
-                        </button>
-                        
-                        <div className="hidden md:block ml-1 border-l border-pink-100 pl-3 h-6 flex items-center">
-                             <span className="text-[10px] text-gray-300 font-bold uppercase tracking-widest whitespace-nowrap">Sair</span>
-                        </div>
                     </div>
                 </header>
 

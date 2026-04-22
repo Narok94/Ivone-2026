@@ -178,7 +178,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                     type="button"
                                     id="client-select-button"
                                     onClick={() => setIsClientDropdownOpen(prev => !prev)}
-                                    className="w-full px-5 py-3 md:px-6 md:py-4 text-left bg-white border-2 border-rose-50 rounded-[20px] md:rounded-[24px] shadow-sm focus:outline-none focus:border-rose-300 transition-all font-medium text-base md:text-lg"
+                                    className="w-full px-5 py-3 md:px-6 md:py-4 text-left bg-white border-2 border-rose-100 rounded-[20px] md:rounded-[24px] shadow-sm focus:outline-none focus:border-rose-300 transition-all font-medium text-base md:text-lg"
                                     aria-haspopup="listbox"
                                     aria-expanded={isClientDropdownOpen}
                                 >
@@ -223,7 +223,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             type="date" 
                             value={saleDate} 
                             onChange={e => setSaleDate(e.target.value)}
-                            className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                            className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                         />
                     </div>
 
@@ -247,7 +247,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         placeholder="Ex: 123" 
                                         value={item.productCode} 
                                         onChange={e => handleItemChange(index, 'productCode', e.target.value)}
-                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                     <Input 
                                         label="Qual o produto? * 💄" 
@@ -255,7 +255,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         value={item.productName} 
                                         onChange={e => handleItemChange(index, 'productName', e.target.value)} 
                                         required
-                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-rose-200 focus:border-[#e91e63] rounded-[20px] md:rounded-[24px]"
                                     />
                                 </div>
 
@@ -267,7 +267,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                         value={item.quantity} 
                                         onChange={e => handleItemChange(index, 'quantity', e.target.value)} 
                                         required
-                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-white focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                                        className="w-full text-base md:text-lg py-3 md:py-4 px-4 md:px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                                     />
                                     <div className="space-y-1 md:space-y-2">
                                         <label className="block text-[10px] md:text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Preço Cada 💸</label>
@@ -283,12 +283,12 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                                 onFocus={(e) => e.target.value === '0' && handleItemChange(index, 'unitPrice', '')}
                                                 onBlur={(e) => e.target.value === '' && handleItemChange(index, 'unitPrice', '0')}
                                                 required
-                                                className="w-full pl-9 pr-3 md:pl-16 md:pr-6 text-base md:text-xl font-black py-3 md:py-4 border-2 border-rose-100 bg-rose-50/50 focus:bg-white focus:border-rose-400 focus:ring-4 focus:ring-rose-200/50 rounded-[20px] md:rounded-[24px] transition-all"
+                                                className="w-full pl-9 pr-3 md:pl-16 md:pr-6 text-base md:text-xl font-black py-3 md:py-4 border-2 border-rose-200 bg-white focus:border-[#e91e63] focus:ring-4 focus:ring-rose-200/50 rounded-[20px] md:rounded-[24px] transition-all"
                                             />
                                         </div>
                                     </div>
                                     <div className="hidden md:flex flex-col justify-end">
-                                        <div className="bg-white/80 rounded-[24px] p-4 flex items-center justify-center border-2 border-rose-50 h-[62px]">
+                                        <div className="bg-white rounded-[24px] p-4 flex items-center justify-center border-2 border-rose-100 h-[62px] shadow-sm">
                                             <span className="text-xl font-black text-emerald-600">
                                                 {((parseFloat(item.quantity) || 0) * (parseFloat(item.unitPrice) || 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                             </span>
@@ -316,7 +316,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             placeholder="Ex: Entrega no sábado..."
                             value={observation} 
                             onChange={e => setObservation(e.target.value)}
-                            className="w-full text-base md:text-xl py-3 md:py-4 px-4 md:px-6 border-2 border-rose-50 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
+                            className="w-full text-base md:text-xl py-3 md:py-4 px-4 md:px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[20px] md:rounded-[24px]"
                         />
 
                         <div className="bg-emerald-500 rounded-[24px] md:rounded-[32px] p-3 md:p-6 text-white text-center shadow-lg shadow-emerald-200">

@@ -8,7 +8,7 @@ interface CardProps {
 
 export const Card: React.FC<CardProps> = ({ children, className = '', onClick }) => (
   <div 
-    className={`bg-white rounded-[32px] shadow-[0_8px_30px_rgba(233,30,99,0.06)] border border-rose-50/50 p-6 transition-all duration-300 ${className} ${onClick ? 'cursor-pointer hover:shadow-[0_20px_40px_rgba(233,30,99,0.12)] hover:-translate-y-1' : ''}`}
+    className={`bg-white rounded-[32px] shadow-[0_12px_24px_-8px_rgba(0,0,0,0.15)] border border-gray-200 p-6 transition-all duration-300 ${className} ${onClick ? 'cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.2)] hover:-translate-y-1 active:scale-95' : ''}`}
     onClick={onClick}
   >
     {children}
@@ -39,12 +39,12 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
 }
 
-export const Input: React.FC<InputProps> = ({ label, id, ...props }) => (
+export const Input: React.FC<InputProps> = ({ label, id, className = '', ...props }) => (
   <div className="space-y-1.5">
-    <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>
+    {label && <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>}
     <input
       id={id}
-      className="w-full px-5 py-3 bg-white border-2 border-rose-50 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-900 font-medium"
+      className={`w-full px-5 py-3 bg-white border-2 border-rose-100 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-900 font-medium placeholder:text-gray-300 ${className}`}
       {...props}
     />
   </div>
@@ -54,13 +54,13 @@ interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
   label: string;
 }
 
-export const TextArea: React.FC<TextAreaProps> = ({ label, id, ...props }) => (
+export const TextArea: React.FC<TextAreaProps> = ({ label, id, className = '', ...props }) => (
   <div className="space-y-1.5">
-    <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>
+    {label && <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>}
     <textarea
       id={id}
       rows={3}
-      className="w-full px-5 py-3 bg-white border-2 border-rose-50 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-800 font-medium"
+      className={`w-full px-5 py-3 bg-white border-2 border-rose-100 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all text-gray-800 font-medium placeholder:text-gray-300 ${className}`}
       {...props}
     ></textarea>
   </div>
@@ -71,12 +71,12 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   children: ReactNode;
 }
 
-export const Select: React.FC<SelectProps> = ({ label, id, children, ...props }) => (
+export const Select: React.FC<SelectProps> = ({ label, id, children, className = '', ...props }) => (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>
+      {label && <label htmlFor={id} className="block text-xs font-black text-rose-400 uppercase tracking-widest ml-1">{label}</label>}
       <select
         id={id}
-        className="w-full px-5 py-3 border-2 bg-white border-rose-50 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all font-medium"
+        className={`w-full px-5 py-3 border-2 bg-white border-rose-100 rounded-2xl shadow-sm focus:outline-none focus:border-[#e91e63] focus:ring-4 focus:ring-rose-50 transition-all font-medium ${className}`}
         {...props}
       >
         {children}

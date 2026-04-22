@@ -39,14 +39,14 @@ export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
                         transition={{ delay: 0.1 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => onNavigate('add_sale')}
-                        className="shimmer-effect flex items-center gap-4 md:gap-5 p-4 md:p-6 bg-[#FFF5F7] border-2 border-rose-100 rounded-[32px] md:rounded-[28px] shadow-[0_8px_30px_rgba(233,30,99,0.05)] hover:shadow-[0_20px_40px_rgba(233,30,99,0.1)] transition-all group text-left"
+                        className="shimmer-effect flex items-center gap-4 md:gap-5 p-4 md:p-6 bg-[#FFF5F7] border border-[#F0C1C9] rounded-[32px] md:rounded-[28px] shadow-[0_12px_24px_-8px_rgba(233,30,99,0.15)] hover:shadow-[0_20px_40px_rgba(233,30,99,0.2)] hover:-translate-y-1 transition-all group text-left"
                     >
-                        <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-2xl md:rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-2xl md:rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform border border-rose-100">
                             <ShoppingCartIcon className="w-6 h-6 md:w-8 md:h-8 text-[#e91e63] group-active:animate-bounce-subtle" />
                         </div>
                         <div>
                             <h3 className="text-lg md:text-xl font-black text-rose-900">Nova Venda</h3>
-                            <p className="text-[10px] md:text-sm text-rose-400 font-bold uppercase tracking-wider">Registrar agora</p>
+                            <p className="text-[10px] md:text-sm text-rose-400 font-bold uppercase tracking-wider italic">Registrar agora</p>
                         </div>
                     </motion.button>
 
@@ -56,14 +56,14 @@ export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
                         transition={{ delay: 0.2 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={() => onNavigate('add_payment')}
-                        className="shimmer-effect flex items-center gap-4 md:gap-5 p-4 md:p-6 bg-[#F1FBF9] border-2 border-emerald-100 rounded-[32px] md:rounded-[28px] shadow-[0_8px_30px_rgba(0,200,83,0.05)] hover:shadow-[0_20px_40px_rgba(0,200,83,0.1)] transition-all group text-left"
+                        className="shimmer-effect flex items-center gap-4 md:gap-5 p-4 md:p-6 bg-[#F1FBF9] border border-[#B2D8D0] rounded-[32px] md:rounded-[28px] shadow-[0_12px_24px_-8px_rgba(0,200,83,0.15)] hover:shadow-[0_20px_40px_rgba(0,200,83,0.2)] hover:-translate-y-1 transition-all group text-left"
                     >
-                        <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-2xl md:rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                        <div className="w-12 h-12 md:w-16 md:h-16 bg-white rounded-2xl md:rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform border border-emerald-100">
                             <CreditCardIcon className="w-6 h-6 md:w-8 md:h-8 text-[#00C853] animate-pulse-emerald" />
                         </div>
                         <div>
                             <h3 className="text-lg md:text-xl font-black text-emerald-900">Receber Pagamento</h3>
-                            <p className="text-[10px] md:text-sm text-emerald-400 font-bold uppercase tracking-wider">Lançar valor</p>
+                            <p className="text-[10px] md:text-sm text-emerald-400 font-bold uppercase tracking-wider italic">Lançar valor</p>
                         </div>
                     </motion.button>
                 </div>
@@ -90,9 +90,9 @@ export const Dashboard: FC<DashboardProps> = ({ onNavigate }) => {
                             transition={{ delay: 0.5 + (idx * 0.1) }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => onNavigate(item.id as any)}
-                            className="flex flex-col items-center justify-center p-5 md:p-6 bg-white border border-rose-50 rounded-[32px] md:rounded-[28px] shadow-[0_8px_30px_rgba(233,30,99,0.05)] hover:shadow-[0_20px_40px_rgba(233,30,99,0.1)] transition-all group text-center"
+                            className="flex flex-col items-center justify-center p-5 md:p-6 bg-white border border-gray-200 rounded-[32px] md:rounded-[28px] shadow-[0_12px_24px_-8px_rgba(0,0,0,0.1)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.15)] hover:-translate-y-1 transition-all group text-center"
                         >
-                            <div className={`w-12 h-12 md:w-14 md:h-14 ${item.bg} rounded-2xl flex items-center justify-center mb-3 md:mb-4 group-hover:scale-110 transition-all shadow-inner`}>
+                            <div className={`w-12 h-12 md:w-14 md:h-14 ${item.bg} rounded-2xl flex items-center justify-center mb-3 md:mb-4 group-hover:scale-110 transition-all shadow-inner border border-gray-100`}>
                                 <item.icon className={`w-6 h-6 md:w-7 md:h-7 ${item.textColor}`} />
                             </div>
                             <span className="font-black text-gray-700 text-[10px] md:text-xs tracking-tight">{item.label}</span>
