@@ -11,6 +11,7 @@ import loginHandler from './api/login.js';
 import clientsHandler from './api/clients.js';
 import salesHandler from './api/sales.js';
 import paymentsHandler from './api/payments.js';
+import backupHandler from './api/backup.js';
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ async function startServer() {
   app.all('/api/sales/:id', wrap(salesHandler));
   app.all('/api/payments', wrap(paymentsHandler));
   app.all('/api/payments/:id', wrap(paymentsHandler));
+  app.all('/api/backup', wrap(backupHandler));
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

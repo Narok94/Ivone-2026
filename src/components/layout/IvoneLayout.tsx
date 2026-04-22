@@ -4,9 +4,12 @@ import {
     UsersIcon, 
     ShoppingCartIcon, 
     CreditCardIcon, 
-    SettingsIcon, 
     LogOutIcon,
-    ArrowLeftIcon
+    ArrowLeftIcon,
+    SettingsIcon,
+    DatabaseIcon,
+    PaletteIcon,
+    XIcon
 } from '../ui';
 import { HeaderSummary } from './HeaderSummary';
 import { Toast } from '../ui';
@@ -23,7 +26,70 @@ interface IvoneLayoutProps {
 }
 
 export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, onBack, toast, setToast }) => {
-    const { logout } = useData();
+    const { logout, refreshData } = useData();
+    const [isConfigOpen, setIsConfigOpen] = useState(false);
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        const saved = localStorage.getItem('ivone_theme');
+        if (saved) return saved === 'dark';
+        return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    });
+
+    React.useEffect(() => {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('ivone_theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('ivone_theme', 'light');
+        }
+    }, [isDarkMode]);
+
+    const handleBackup = async () => {
+        try {
+            const res = await fetch('/api/backup');
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_ivone_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            setToast('Erro ao realizar backup ❌');
+        }
+    };
+
+    const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!confirm('Isso irá apagar todos os dados atuais e substituir pelo backup. Continuar?')) {
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const content = JSON.parse(event.target?.result as string);
+                const res = await fetch('/api/backup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(content)
+                });
+                
+                if (res.ok) {
+                    setToast('Backup restaurado com sucesso! ✨');
+                    refreshData();
+                } else {
+                    setToast('Erro ao restaurar backup ❌');
+                }
+            } catch (err) {
+                setToast('Arquivo inválido ❌');
+            }
+        };
+        reader.readAsText(file);
+    };
 
     const mobileNavItems = [
         { id: 'dashboard', icon: HomeIcon, label: 'Início' },
@@ -55,7 +121,70 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                     {/* Navigation Actions */}
                     <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-2">
                         {activeView === 'dashboard' ? (
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2">
+                                {/* Settings Cog */}
+                                <div className="relative">
+                                    <button 
+                                        onClick={() => setIsConfigOpen(!isConfigOpen)}
+                                        className={`p-2.5 transition-all active:scale-90 flex items-center gap-2 bg-white rounded-full shadow-sm border border-gray-100 ${isConfigOpen ? 'text-[#e91e63] ring-2 ring-rose-100' : 'text-gray-400 hover:text-[#e91e63]'}`}
+                                        title="Configurações"
+                                    >
+                                        <SettingsIcon className={`w-5 h-5 ${isConfigOpen ? 'animate-spin-slow' : ''}`} />
+                                    </button>
+
+                                    {/* Settings Dropdown */}
+                                    {isConfigOpen && (
+                                        <div className="absolute right-0 mt-3 w-64 bg-white rounded-[24px] shadow-2xl border border-rose-50 p-4 z-50 animate-view-enter">
+                                            <div className="flex items-center justify-between mb-4 pb-2 border-b border-rose-50">
+                                                <span className="font-black text-rose-800 text-xs uppercase tracking-widest">Configurações</span>
+                                                <button onClick={() => setIsConfigOpen(false)} className="text-gray-300 hover:text-rose-500">
+                                                    <XIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {/* Theme Toggle */}
+                                                <button 
+                                                    onClick={() => setIsDarkMode(!isDarkMode)}
+                                                    className="w-full flex items-center justify-between p-3 hover:bg-rose-50 rounded-2xl transition-colors group"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <PaletteIcon className="w-5 h-5 text-rose-400 group-hover:text-rose-600" />
+                                                        <span className="text-sm font-bold text-gray-700">Tema Escuro</span>
+                                                    </div>
+                                                    <div className={`w-10 h-5 rounded-full relative transition-colors ${isDarkMode ? 'bg-[#e91e63]' : 'bg-gray-200'}`}>
+                                                        <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-transform ${isDarkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                    </div>
+                                                </button>
+
+                                                <div className="h-px bg-rose-50 my-2" />
+
+                                                {/* Backup Action */}
+                                                <button 
+                                                    onClick={handleBackup}
+                                                    className="w-full flex items-center gap-3 p-3 hover:bg-rose-50 rounded-2xl transition-colors group"
+                                                >
+                                                    <DatabaseIcon className="w-5 h-5 text-rose-400 group-hover:text-rose-600" />
+                                                    <div className="text-left">
+                                                        <span className="block text-sm font-bold text-gray-700">Realizar Backup</span>
+                                                        <span className="text-[10px] text-gray-400 font-medium tracking-tight">Baixar todos os seus dados</span>
+                                                    </div>
+                                                </button>
+
+                                                {/* Restore Action */}
+                                                <label className="w-full flex items-center gap-3 p-3 hover:bg-rose-50 rounded-2xl transition-colors group cursor-pointer">
+                                                    <CreditCardIcon className="w-5 h-5 text-rose-400 group-hover:text-rose-600" />
+                                                    <div className="text-left">
+                                                        <span className="block text-sm font-bold text-gray-700">Subir Backup</span>
+                                                        <span className="text-[10px] text-gray-400 font-medium tracking-tight">Restaurar de arquivo .json</span>
+                                                    </div>
+                                                    <input type="file" accept=".json" onChange={handleRestore} className="hidden" />
+                                                </label>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <button 
                                     onClick={logout}
                                     className="p-2.5 text-gray-400 hover:text-[#e91e63] transition-all active:scale-90 flex items-center gap-2 bg-white rounded-full shadow-sm border border-gray-100"

@@ -20,6 +20,7 @@ interface DataContextType {
 
   clientBalances: Map<string, number>;
   isLoading: boolean;
+  refreshData: () => Promise<void>;
   
   user: { id: string, username: string } | null;
   login: (pin: string) => Promise<{ success: boolean; message?: string }>;
@@ -208,6 +209,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     payments, addPayment, updatePayment, deletePayment,
     clientBalances,
     isLoading,
+    refreshData,
     user, login, logout
   };
 
