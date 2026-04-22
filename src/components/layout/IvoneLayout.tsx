@@ -105,7 +105,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 <div className="absolute inset-0 bg-[#fdfdfd] shadow-2xl rounded-[2.5rem] paper-texture -z-10 border border-gray-300" />
                 
                 {/* Header with Logo at Top Left */}
-                <header className="py-6 md:py-8 relative min-h-[100px] md:min-h-[140px] flex items-center justify-center">
+                <header className="py-6 md:py-8 relative min-h-[100px] md:min-h-[140px] flex items-center justify-center z-50">
                     <div className="absolute left-0 top-2 md:top-4">
                         <img 
                             src="/logo-ivone.png" 
@@ -134,7 +134,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
 
                                     {/* Settings Dropdown */}
                                     {isConfigOpen && (
-                                        <div className="absolute right-0 mt-3 w-64 bg-white rounded-[24px] shadow-2xl border border-rose-50 p-4 z-50 animate-view-enter">
+                                        <div className="absolute right-0 mt-3 w-64 bg-white rounded-[24px] shadow-2xl border border-rose-50 p-4 z-[60] animate-view-enter">
                                             <div className="flex items-center justify-between mb-4 pb-2 border-b border-rose-50">
                                                 <span className="font-black text-rose-800 text-xs uppercase tracking-widest">Configurações</span>
                                                 <button onClick={() => setIsConfigOpen(false)} className="text-gray-300 hover:text-rose-500">
