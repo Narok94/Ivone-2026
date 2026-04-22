@@ -52,7 +52,7 @@ export const Login: FC = () => {
                     {/* Logo Section */}
                     <div className="mb-6 flex justify-center">
                         <img 
-                            src="/logo-ivone.PNG" 
+                            src="/logo-ivone.png" 
                             alt="Ivone Logo" 
                             className="w-[200px] h-auto drop-shadow-[0_4px_6px_rgba(233,30,99,0.2)] object-contain"
                         />

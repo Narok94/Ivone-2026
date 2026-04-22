@@ -42,7 +42,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 <header className="py-6 md:py-8 text-center relative px-16">
                     <div className="flex flex-col items-center gap-2 mb-2">
                         <img 
-                            src="/logo-ivone.PNG" 
+                            src="/logo-ivone.png" 
                             alt="Logo Ivone" 
                             className="h-[50px] w-auto drop-shadow-[0_2px_4px_rgba(233,30,99,0.15)] object-contain"
                         />
