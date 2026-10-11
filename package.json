@@ -6,9 +6,11 @@
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "build:demo": "vite build --config vite.demo.config.ts",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "test": "node --import tsx --test tests/auth.test.ts tests/frontend.test.tsx tests/mobile-demo.test.ts"
+    "test": "node --import tsx --test tests/auth.test.ts tests/frontend.test.tsx tests/mobile-demo.test.ts tests/demo-isolation.test.ts",
+    "test:demo-artifact": "node tests/verify-demo-artifact.cjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",

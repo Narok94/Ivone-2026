@@ -10,7 +10,7 @@ const shortcuts = [
   { label: 'Extrato', icon: ReceiptText, text: 'Extrato Ana' },
   { label: 'Pendências', icon: ClipboardList, text: 'Pendências' },
 ];
-export default function MobileChatDemo() {
+export default function MobileChatDemo({ standalone = false }: { standalone?: boolean }) {
   const [entries, setEntries] = useState<Entry[]>(() => initialEntries.map(e => ({ ...e })));
   const [messages, setMessages] = useState<Message[]>([{ id: 0, text: 'Oi! Eu sou seu Caderninho 🌷\nVamos cuidar das suas vendas com calma? Escolha um atalho ou escreva uma mensagem.' }]);
   const [input, setInput] = useState('');
@@ -54,7 +54,7 @@ export default function MobileChatDemo() {
         <div className="chat-heading"><h1>Caderninho</h1><p>Seu cuidado, em cada detalhe</p></div>
         <Flower2 className="chat-flower" size={27} aria-hidden="true" />
       </header>
-      <div className="chat-demo-label"><span>DEMONSTRAÇÃO · DADOS FICTÍCIOS</span><a href="/?modo=gestao">Gestão atual <ChevronRight size={12} /></a></div>
+      <div className="chat-demo-label"><span>DEMONSTRAÇÃO · DADOS FICTÍCIOS</span>{standalone ? <span>Sem dados reais</span> : <a href="/?modo=gestao">Gestão atual <ChevronRight size={12} /></a>}</div>
       <div className="chat-feed" ref={feed} role="log" aria-label="Conversa com o Caderninho" aria-live="polite" aria-relevant="additions text">
         <div className="chat-day">Seu caderninho de hoje</div>
         <div className="chat-welcome"><Flower2 size={22} /><strong>Um jeitinho simples de organizar</strong><span>Vendas, recebimentos e carinho.</span></div>

@@ -8,6 +8,18 @@ const output = process.env.VISUAL_OUTPUT || 'test-results';
   fs.mkdirSync(output, { recursive: true });
   const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || 'msedge' });
   try {
+    if (process.env.DEMO_ONLY && process.env.CHECK_NO_API) {
+      const context = await browser.newContext();
+      for (const endpoint of ['clients', 'sales', 'payments', 'backup', 'session', 'login', 'logout']) {
+        for (const method of ['GET', 'POST']) {
+          const response = await context.request.fetch(`${base}/api/${endpoint}`, { method });
+          assert.equal(response.status(), 404, `${method} /api/${endpoint} must not exist in the public demo`);
+        }
+      }
+      assert.equal((await context.request.get(base + '/demo')).status(), 200);
+      await context.close();
+      console.log('PASS public anonymous /demo returns 200; 14 API probes return 404');
+    }
     for (const [width, height] of [[414,896],[393,852],[320,568],[375,667],[430,932],[360,800],[896,414]]) {
       const page = await browser.newPage({ viewport: { width, height }, isMobile: true, hasTouch: true });
       const api = []; const errors = [];
@@ -19,6 +31,7 @@ const output = process.env.VISUAL_OUTPUT || 'test-results';
       });
       await page.goto(base + '/demo');
       await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor();
+      if (process.env.DEMO_ONLY) assert.equal(await page.getByRole('link', { name: /Gestão atual/ }).count(), 0);
       const layout = async () => {
         const metrics = await page.evaluate(() => {
           const composer = document.querySelector('.chat-composer').getBoundingClientRect();
@@ -66,6 +79,15 @@ const output = process.env.VISUAL_OUTPUT || 'test-results';
       assert.deepEqual(api, []); assert.deepEqual(errors, []);
       console.log(`PASS mobile ${width}x${height}: interaction, reset, layout, reduced viewport, zero API calls`);
       await page.close();
+    }
+    if (process.env.DEMO_ONLY) {
+      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+      await page.goto(base + '/?modo=gestao');
+      await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor();
+      assert.equal(await page.getByRole('link', { name: /Gestão atual/ }).count(), 0);
+      await page.close();
+      console.log('PASS public desktop and modo=gestao remain exclusively fictitious');
+      return;
     }
     const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
     await page.route('**/api/**', route => {
