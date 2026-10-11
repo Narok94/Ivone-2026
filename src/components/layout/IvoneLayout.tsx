@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/api';
 import React, { FC, useState } from 'react';
 import { 
     HomeIcon, 
@@ -27,6 +28,10 @@ interface IvoneLayoutProps {
 
 export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, onBack, toast, setToast }) => {
     const { logout, refreshData } = useData();
+    const handleLogout = async () => {
+        try { await logout(); }
+        catch { setToast('Não foi possível encerrar a sessão. Tente novamente.'); }
+    };
     const [isConfigOpen, setIsConfigOpen] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState(() => {
         const saved = localStorage.getItem('ivone_theme');
@@ -46,7 +51,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
 
     const handleBackup = async () => {
         try {
-            const res = await fetch('/api/backup');
+            const res = await apiFetch('/api/backup');
             const data = await res.json();
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -72,7 +77,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
         reader.onload = async (event) => {
             try {
                 const content = JSON.parse(event.target?.result as string);
-                const res = await fetch('/api/backup', {
+                const res = await apiFetch('/api/backup', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(content)
@@ -186,7 +191,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                                 </div>
 
                                 <button 
-                                    onClick={logout}
+                                    onClick={handleLogout}
                                     className="p-2.5 text-gray-400 hover:text-[#e91e63] transition-all active:scale-90 flex items-center gap-2 bg-white rounded-full shadow-sm border border-gray-100"
                                     title="Sair do Caderninho"
                                 >
@@ -236,7 +241,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
             </nav>
 
             <button 
-                onClick={logout}
+                onClick={handleLogout}
                 className="hidden md:flex items-center gap-2 fixed bottom-8 right-8 p-4 bg-white border border-pink-100 text-gray-400 hover:text-red-500 rounded-full shadow-lg transition-all font-bold md:hidden"
             >
                 <LogOutIcon className="w-5 h-5" />

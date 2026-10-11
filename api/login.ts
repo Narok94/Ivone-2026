@@ -1,55 +1,30 @@
 import { pool } from './db.js';
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createSession, noCache, sameOrigin } from '../server/lib/session.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  console.log(`[HANDLER LOG] Request: ${req.method} ${req.url}`);
-  
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
+  noCache(res);
+  if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
+  const contentType = req.headers['content-type'];
+  if (!sameOrigin(req) || typeof contentType !== 'string' || !contentType.toLowerCase().startsWith('application/json')) {
+    return res.status(403).json({ success: false, message: 'Requisição não autorizada.' });
   }
-
   const { username, pin } = req.body || {};
-  console.log(`[HANDLER LOG] Body:`, { username, pinProvided: !!pin });
-
-  if (!username || !pin) {
-    return res.status(400).json({ success: false, message: 'Usuário e PIN são obrigatórios. 🌸' });
+  if (typeof username !== 'string' || !username || username.length > 100 || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
+    return res.status(400).json({ success: false, message: 'Usuário e PIN de 4 números são obrigatórios. 🌸' });
   }
-
+  let user: { id: string; username: string; pin: string };
   try {
-    console.log(`[HANDLER LOG] Querying user: ${username}...`);
-    const result = await pool.query('SELECT * FROM usuarios WHERE username = $1', [username]);
-    console.log(`[HANDLER LOG] Query completed. Rows found: ${result.rows.length}`);
-    
-    if (result.rows.length === 0) {
-      // Check if ANY users exist
-      const totalUsers = await pool.query('SELECT count(*) as count FROM usuarios');
-      const count = parseInt(totalUsers.rows[0].count);
-      console.log(`[HANDLER LOG] Total users in table: ${count}`);
-      
-      if (count === 0) {
-        return res.status(401).json({ 
-          success: false, 
-          message: 'O banco de dados ainda está sendo configurado. Tente novamente em 2 segundos! 🌸',
-          retry: true
-        });
-      }
-      
-      return res.status(401).json({ success: false, message: 'Usuário não encontrado. 🌸' });
-    }
-
-    const user = result.rows[0];
-    if (user.pin === pin) {
-      console.log(`[SERVERLESS LOGIN] Success: ${username}`);
-      return res.json({ success: true, user: { id: user.id, username: user.username } });
-    } else {
-      return res.status(401).json({ success: false, message: 'PIN incorreto. 🌸' });
-    }
-  } catch (err: any) {
-    console.error('[SERVERLESS LOGIN ERROR]:', err);
-    return res.status(500).json({ 
-      success: false, 
-      message: 'Erro no servidor ou banco offline. 🌸',
-      error: err.message 
-    });
+    const result = await pool.query('SELECT id, username, pin FROM usuarios WHERE username = $1', [username]);
+    user = result.rows[0];
+    if (!user || user.pin !== pin) return res.status(401).json({ success: false, message: 'Usuário ou PIN incorreto. 🌸' });
+  } catch {
+    return res.status(503).json({ success: false, message: 'Login temporariamente indisponível. 🌸' });
+  }
+  try {
+    const session = await createSession(req, res, { id: user.id, username: user.username });
+    return res.json({ success: true, user: session.user, csrfToken: session.csrfToken });
+  } catch {
+    return res.status(503).json({ success: false, message: 'Autenticação temporariamente indisponível. 🌸' });
   }
 }

@@ -1,6 +1,8 @@
+import { requireSession } from '../server/lib/session.js';
 import { pool } from './db.js';
 
 export default async function backupHandler(req: any, res: any) {
+  if (!await requireSession(req, res)) return;
   if (req.method === 'GET') {
     try {
       const [clients, sales, payments] = await Promise.all([
@@ -21,7 +23,7 @@ export default async function backupHandler(req: any, res: any) {
 
       res.json(backupData);
     } catch (error: any) {
-      res.status(500).json({ success: false, message: 'Erro ao gerar backup', error: error.message });
+      res.status(500).json({ success: false, message: 'Erro ao gerar backup', error: 'Não foi possível concluir a operação.' });
     }
   } else if (req.method === 'POST') {
     const body = req.body;
@@ -99,8 +101,8 @@ export default async function backupHandler(req: any, res: any) {
       res.json({ success: true, message: 'Backup restaurado com sucesso!' });
     } catch (error: any) {
       await dbClient.query('ROLLBACK');
-      console.error('Erro na restauração:', error);
-      res.status(500).json({ success: false, message: 'Erro ao restaurar backup', error: error.message });
+      console.error('API operation failed');
+      res.status(500).json({ success: false, message: 'Erro ao restaurar backup', error: 'Não foi possível concluir a operação.' });
     } finally {
       dbClient.release();
     }

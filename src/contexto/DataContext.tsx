@@ -1,3 +1,4 @@
+import { apiFetch, setCsrfToken } from '../lib/api';
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useCallback } from 'react';
 import { Client, Sale, Payment } from '../types';
 
@@ -24,7 +25,7 @@ interface DataContextType {
   
   user: { id: string, username: string } | null;
   login: (pin: string) => Promise<{ success: boolean; message?: string }>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -45,9 +46,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setIsLoading(true);
     try {
       const [clientsRes, salesRes, paymentsRes] = await Promise.all([
-        fetch('/api/clients').then(r => r.json()),
-        fetch('/api/sales').then(r => r.json()),
-        fetch('/api/payments').then(r => r.json())
+        apiFetch('/api/clients').then(r => r.json()),
+        apiFetch('/api/sales').then(r => r.json()),
+        apiFetch('/api/payments').then(r => r.json())
       ]);
       setClients(clientsRes);
       setSales(salesRes);
@@ -60,29 +61,43 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [user]);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('ivone_user');
-    if (savedUser) {
-        setUser(JSON.parse(savedUser));
-    } else {
-        setIsLoading(false);
-    }
+    let active = true;
+    const clearUser = () => {
+      setUser(null);
+      setClients([]);
+      setSales([]);
+      setPayments([]);
+      setIsLoading(false);
+    };
+    window.addEventListener('ivone:unauthorized', clearUser);
+    localStorage.removeItem('ivone_user');
+    apiFetch('/api/session').then(r => r.json()).then(session => {
+      if (!active) return;
+      setCsrfToken(session.csrfToken);
+      setUser(session.user);
+    }).catch(() => {
+      if (active) clearUser();
+    }).finally(() => {
+      if (active) setIsLoading(false);
+    });
+    return () => {
+      active = false;
+      window.removeEventListener('ivone:unauthorized', clearUser);
+    };
   }, []);
 
   useEffect(() => {
-    if (user) {
-        refreshData();
-        localStorage.setItem('ivone_user', JSON.stringify(user));
-    } else {
-        localStorage.removeItem('ivone_user');
-        setClients([]);
-        setSales([]);
-        setPayments([]);
+    if (user) refreshData();
+    else {
+      setClients([]);
+      setSales([]);
+      setPayments([]);
     }
   }, [user, refreshData]);
 
   const login = async (pin: string) => {
     try {
-      const res = await fetch('/api/login', {
+      const res = await apiFetch('/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: 'Ivone', pin })
@@ -91,6 +106,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const data = await res.json();
       
       if (res.ok && data.success) {
+        setCsrfToken(data.csrfToken);
         setUser(data.user);
         return { success: true };
       }
@@ -105,15 +121,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login request error:', e);
       return { 
         success: false, 
-        message: `Erro de conexão: ${e.message || 'Verifique se o banco de dados está online.'} 🌸` 
+        message: e.message || 'Erro de conexão. Tente novamente. 🌸'
       };
     }
   };
 
-  const logout = () => setUser(null);
+  const logout = async () => {
+    // Service failures must not pretend server-side revocation succeeded.
+    await apiFetch('/api/logout', { method: 'POST' });
+    setCsrfToken(null);
+    setUser(null);
+    setClients([]);
+    setSales([]);
+    setPayments([]);
+  };
 
   const addClient = useCallback(async (clientData: Omit<Client, 'id'>) => {
-    const res = await fetch('/api/clients', {
+    const res = await apiFetch('/api/clients', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(clientData)
@@ -123,7 +147,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const updateClient = useCallback(async (updatedClient: Client) => {
-    const res = await fetch(`/api/clients?id=${updatedClient.id}`, {
+    const res = await apiFetch(`/api/clients?id=${updatedClient.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedClient)
@@ -133,7 +157,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const deleteClient = useCallback(async (clientId: string) => {
-    await fetch(`/api/clients?id=${clientId}`, { method: 'DELETE' });
+    await apiFetch(`/api/clients?id=${clientId}`, { method: 'DELETE' });
     setClients(prev => prev.filter(c => c.id !== clientId));
   }, []);
   
@@ -141,7 +165,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const addSale = useCallback(async (saleData: Omit<Sale, 'id'|'total'>) => {
     const total = parseFloat((saleData.quantity * saleData.unitPrice).toFixed(2));
-    const res = await fetch('/api/sales', {
+    const res = await apiFetch('/api/sales', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...saleData, total })
@@ -153,7 +177,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   
   const updateSale = useCallback(async (updatedSale: Sale) => {
     const total = parseFloat((updatedSale.quantity * updatedSale.unitPrice).toFixed(2));
-    const res = await fetch(`/api/sales?id=${updatedSale.id}`, {
+    const res = await apiFetch(`/api/sales?id=${updatedSale.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...updatedSale, total })
@@ -164,12 +188,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const deleteSale = useCallback(async (saleId: string) => {
-    await fetch(`/api/sales?id=${saleId}`, { method: 'DELETE' });
+    await apiFetch(`/api/sales?id=${saleId}`, { method: 'DELETE' });
     setSales(prev => prev.filter(s => s.id !== saleId));
   }, []);
 
   const addPayment = useCallback(async (paymentData: Omit<Payment, 'id'>) => {
-    const res = await fetch('/api/payments', {
+    const res = await apiFetch('/api/payments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(paymentData)
@@ -179,7 +203,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
   
   const updatePayment = useCallback(async (updatedPayment: Payment) => {
-    const res = await fetch(`/api/payments?id=${updatedPayment.id}`, {
+    const res = await apiFetch(`/api/payments?id=${updatedPayment.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updatedPayment)
@@ -189,7 +213,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const deletePayment = useCallback(async (paymentId: string) => {
-    await fetch(`/api/payments?id=${paymentId}`, { method: 'DELETE' });
+    await apiFetch(`/api/payments?id=${paymentId}`, { method: 'DELETE' });
     setPayments(prev => prev.filter(p => p.id !== paymentId));
   }, []);
 

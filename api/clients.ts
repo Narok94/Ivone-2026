@@ -1,7 +1,9 @@
+import { requireSession } from '../server/lib/session.js';
 import { pool } from './db.js';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!await requireSession(req, res)) return;
   const { id } = req.query;
 
   try {
@@ -82,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(405).json({ message: 'Method Not Allowed' });
   } catch (err: any) {
-    console.error('[SERVERLESS CLIENTS ERROR]:', err);
-    return res.status(500).json({ error: err.message });
+    console.error('API operation failed');
+    return res.status(500).json({ error: 'Não foi possível concluir a operação.' });
   }
 }

@@ -34,8 +34,12 @@ export const AllPayments: FC<{ onEditPayment: (payment: Payment) => void; showTo
 
     const handleDelete = async (paymentId: string) => {
         if (window.confirm('Tem certeza que deseja excluir este recebimento?')) {
-            await deletePayment(paymentId);
-            showToast('Recebimento excluído com sucesso!');
+            try {
+                await deletePayment(paymentId);
+                showToast('Recebimento excluído com sucesso!');
+            } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Não foi possível excluir o registro.');
+            }
         }
     };
     

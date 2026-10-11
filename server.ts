@@ -3,8 +3,9 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import cors from 'cors';
-import { initDb } from './api/db.js';
+
+import sessionHandler from './api/session.js';
+import logoutHandler from './api/logout.js';
 
 // Import serverless handlers
 import loginHandler from './api/login.js';
@@ -22,7 +23,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(cors());
+  // Same-origin API: no permissive cross-origin access.
+  process.env.NODE_ENV ||= 'development';
   app.use(express.json());
 
   // Request logging
@@ -31,27 +33,23 @@ async function startServer() {
     next();
   });
 
-  // Database Initialization - Wait for it to ensure Ivone exists
-  try {
-    await initDb();
-    console.log('✅ Database sync complete.');
-  } catch (err) {
-    console.error('❌ Database sync FAILED:', err);
-  }
+  // Database provisioning is deliberately excluded from application startup.
 
   // API Routes - Local Wrapper for Serverless functions
   const wrap = (handler: any) => async (req: any, res: any) => {
     try {
       await handler(req, res);
     } catch (err: any) {
-      console.error(`[WRAPPER ERROR] ${req.path}:`, err);
+      console.error('API request failed');
       if (!res.headersSent) {
-        res.status(500).json({ success: false, message: 'Internal Server Error', error: err.message });
+        res.status(500).json({ success: false, message: 'Internal Server Error' });
       }
     }
   };
 
   app.all('/api/login', wrap(loginHandler));
+  app.all('/api/session', wrap(sessionHandler));
+  app.all('/api/logout', wrap(logoutHandler));
   app.all('/api/clients', wrap(clientsHandler));
   app.all('/api/clients/:id', wrap(clientsHandler));
   app.all('/api/sales', wrap(salesHandler));

@@ -31,8 +31,12 @@ export const ManageClients: FC<{ setActiveView: (view: View) => void; onViewClie
     const handleDelete = async (e: React.MouseEvent, clientId: string) => {
         e.stopPropagation(); // Prevent row click when deleting
         if (window.confirm('Tem certeza que deseja excluir este cliente? Todas as vendas e pagamentos associados permanecerão no histórico, mas não será possível associar novas transações a ele.')) {
-            await deleteClient(clientId);
-            showToast('Cliente excluído com sucesso!');
+            try {
+                await deleteClient(clientId);
+                showToast('Cliente excluído com sucesso!');
+            } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Não foi possível excluir o registro.');
+            }
         }
     };
 

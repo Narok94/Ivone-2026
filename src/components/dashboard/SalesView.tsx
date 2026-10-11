@@ -73,8 +73,12 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
     const handleDelete = async (e: React.MouseEvent, saleId: string) => {
         e.stopPropagation();
         if (window.confirm('Tem certeza que deseja excluir esta encomenda?')) {
-            await deleteSale(saleId);
-            showToast('Encomenda excluída com sucesso!');
+            try {
+                await deleteSale(saleId);
+                showToast('Encomenda excluída com sucesso!');
+            } catch (error) {
+                showToast(error instanceof Error ? error.message : 'Não foi possível excluir o registro.');
+            }
         }
     };
 
