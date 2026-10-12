@@ -126,7 +126,7 @@ export default function MobileCaderninho() {
   return <ChatFrame revision={`${messages.length}:${working}`} actions={<button disabled={working || reply.state.type !== 'idle'} onClick={() => void send('Sair')}>Sair</button>} footer={<>
     <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(input); }}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Converse com seu Caderninho…" aria-label="Mensagem" maxLength={2000} autoComplete="off" disabled={working || blocked} /><button type="submit" aria-label="Enviar mensagem" disabled={!input.trim() || working || blocked}><ArrowUp size={22} /></button></form>
     {reply.state.type === 'attachment' && <input ref={attachment} hidden aria-label="Arquivo de backup" type="file" accept=".json" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void attach(file); }} />}
-    <p className="chat-footer-note">Só anoto depois da sua confirmação.</p>
+    <p className="chat-footer-note">{user?.username === 'Teste local fictício' ? 'Teste local · dados fictícios · só salvo após confirmar.' : 'Só anoto depois da sua confirmação.'}</p>
   </>}>
     {dataError && <div className="chat-bubble" role="alert"><p>{dataError}</p><button disabled={working} onClick={() => void send('Verificar resultado')}>Tentar atualizar</button></div>}
     {messages.map(message => <div key={message.id} className={`chat-bubble ${message.own ? 'chat-own' : ''} ${message.summary ? 'chat-conversation-summary' : ''}`}><p>{message.text}</p>{message.summary && <p className="chat-summary-text">{message.summary}</p>}<span className="chat-bubble-caption">{message.own ? 'Você ✓✓' : 'Caderninho'}</span></div>)}

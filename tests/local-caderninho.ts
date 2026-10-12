@@ -1,0 +1,82 @@
+// Essential integration check of the new opt-in launcher, not the full approved suite.
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+process.env.DATABASE_URL = 'postgresql://prohibited.invalid/real';
+process.env.AUTH_REDIS_REST_URL = 'https://prohibited.invalid';
+process.env.AUTH_REDIS_REST_TOKEN = 'must-not-be-used';
+const { startSandbox } = await import('../server/local/start.js');
+const server = await startSandbox({ port: 0 });
+const { pool } = await import('../server/local/database.js');
+const address = server.address();
+if (!address || typeof address === 'string') throw new Error('Local server unavailable');
+const base = `http://127.0.0.1:${address.port}`;
+let browser;
+try {
+  assert.equal(process.env.DATABASE_URL, undefined);
+  assert.equal(process.env.AUTH_REDIS_REST_URL, undefined);
+  assert.equal(pool.sandboxOnly, true);
+  const { startServer } = await import('../server.js');
+  process.env.NODE_ENV = 'production';
+  await assert.rejects(startServer({ sandbox: true, port: 0 }), /Modo fictício exige/);
+  await assert.rejects(startSandbox({ port: 0 }), /Modo fictício permitido/);
+  process.env.NODE_ENV = 'development';
+  process.env.VERCEL = '1';
+  await assert.rejects(startServer({ sandbox: true, port: 0 }), /Modo fictício exige/);
+  await assert.rejects(startSandbox({ port: 0 }), /Modo fictício permitido/);
+  delete process.env.VERCEL;
+  await assert.rejects(startServer({ demo: { origin: 'https://demo.test', token: 'a'.repeat(43), expiresAt: Date.now() + 1000 }, port: 0 }), /Demonstração exige/);
+  await assert.rejects(import('../api/db.js'), /Banco real proibido/);
+  assert.equal((await fetch(base + '/api/operations')).status, 401);
+  if (process.argv.includes('--startup-only')) {
+    const session = await (await fetch(base + '/api/session')).json();
+    assert.equal(session.localSandbox, true);
+    assert.match(session.user.id, /^local-/);
+    console.log('PASS local startup/session/shutdown; production/Vercel demo denied; no real credentials');
+  } else {
+  browser = await chromium.launch({ headless: true, channel: 'msedge' });
+  const context = await browser.newContext({ viewport: { width: 393, height: 852 }, acceptDownloads: true });
+  const page = await context.newPage();
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await page.route('https://fonts.googleapis.com/**', route => route.abort());
+  await page.route('https://fonts.gstatic.com/**', route => route.abort());
+  await page.goto(base + '/?modo=gestao');
+  await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor();
+  assert.equal(await page.getByPlaceholder('PIN de 4 números').count(), 0);
+  assert.equal(await page.locator('nav, .chat-feed input, .chat-feed select, .chat-feed textarea').count(), 0);
+  await page.getByText(/Teste local · dados fictícios/).waitFor();
+  const wait = () => page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled'));
+  const say = async (text: string) => { await wait(); await page.getByLabel('Mensagem', { exact: true }).fill(text); await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click(); await wait(); };
+  const counts = async () => (await pool.query('SELECT (SELECT count(*)::int FROM vendas) AS sales,(SELECT count(*)::int FROM pagamentos) AS payments')).rows[0];
+  await wait();
+  assert.equal((await context.request.post(base + '/api/clients', { data: { fullName: 'Sem CSRF' }, headers: { Origin: base } })).status(), 403);
+  await say('Cadastrar cliente Ana'); await say('Não informar'); await say('Concluir cadastro');
+  assert.equal((await pool.query("SELECT count(*)::int AS n FROM clientes WHERE full_name='Ana'")).rows[0].n, 0);
+  await say('Confirmar');
+  await say('Editar cliente Ana'); await say('telefone'); await say('11999990000'); await say('Concluir cadastro'); await say('Confirmar');
+  assert.equal((await pool.query("SELECT phone FROM clientes WHERE full_name='Ana'")).rows[0].phone, '11999990000');
+  await say('Nova venda'); await say('Maria'); await say('perfume'); await say('dois'); await say('150'); await say('Não, continuar'); await say('Pagou uma parte'); await say('100');
+  assert.deepEqual(await counts(), { sales: 0, payments: 0 });
+  await say('Corrigir'); await say('valor'); await say('160'); await say('Confirmar');
+  assert.deepEqual(await counts(), { sales: 1, payments: 1 });
+  await say('Venda Maria sabonete 25'); await say('Pagou tudo'); await say('Confirmar');
+  assert.deepEqual(await counts(), { sales: 2, payments: 2 });
+  await say('Maria pagou 20 reais'); await say('Confirmar');
+  assert.deepEqual(await counts(), { sales: 2, payments: 3 });
+  await say('Venda Maria creme 80'); await say('Ainda não pagou'); await say('Cancelar');
+  assert.deepEqual(await counts(), { sales: 2, payments: 3 });
+  await say('Quanto a Maria deve?'); assert.match(await page.locator('.chat-bubble p').last().innerText(), /200,00/);
+  await say('Mostra o extrato da Maria'); assert.match(await page.locator('.chat-bubble p').last().innerText(), /Extrato de Maria/);
+  await say('Relatórios'); await say('Todo o histórico'); assert.match(await page.locator('.chat-bubble p').last().innerText(), /345,00/);
+  await say('Configurações'); await say('Tema escuro'); await say('Confirmar'); assert.equal(await page.evaluate(() => localStorage.getItem('ivone_theme')), 'dark');
+  const download = page.waitForEvent('download'); await say('Baixar backup'); assert.equal((await download).suggestedFilename(), 'backup_ivone.json');
+  await page.reload(); await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor();
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.getByText('Nova Venda', { exact: true }).waitFor();
+  assert.equal(await page.locator('.chat-demo').count(), 0);
+  assert.deepEqual(errors, []);
+  console.log('PASS local sandbox: direct chat, fictional database, protected APIs, guided client/sale/payment/correction/cancel/queries/settings and desktop management');
+  }
+} finally {
+  await browser?.close();
+  await new Promise<void>(resolve => server.close(() => resolve()));
+  await pool.end();
+}

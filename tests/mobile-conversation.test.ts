@@ -5,6 +5,15 @@ import { parseChatSale, parseChatDate, transition, type Reply, type Snapshot, ty
 const maria = { id: '00000000-0000-4000-8000-000000000001', fullName: 'Maria', phone: '', email: '', cpf: '', cep: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', observation: '' } satisfies Client;
 const snapshot: Snapshot = { clients: [maria], sales: [], payments: [] };
 const idle: State = { type: 'idle' };
+test('guided product names overlapping query keywords keep a valid draft and ask for quantity', () => {
+  let r = transition(idle, 'Nova venda', snapshot);
+  r = transition(r.state, 'Maria', snapshot);
+  r = transition(r.state, 'kit saldo', snapshot);
+  assert.equal(r.state.type, 'finance');
+  if (r.state.type === 'finance') { assert.equal(r.state.step, 'quantity'); assert.equal(r.state.draft.value.items[0].productName, 'kit saldo'); }
+  assert.equal(r.action, undefined);
+  r = transition(r.state, 'Cancelar', snapshot); assert.equal(r.state.type, 'idle');
+});
 function talk(lines: string[], data = snapshot) { let reply: Reply = { state: idle, text: '', choices: [] }; for (const line of lines) { reply = transition(reply.state, line, data); assert.equal(reply.action, undefined, `must not write before confirming: ${line}`); } return reply; }
 
 test('natural-language sale with explicit entry/remainder is proposed with exact cents, never saved implicitly', () => {

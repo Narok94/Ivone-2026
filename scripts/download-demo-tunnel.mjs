@@ -1,0 +1,17 @@
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync } from 'node:fs';
+const response = await fetch('https://api.github.com/repos/cloudflare/cloudflared/releases/latest', { headers: { 'User-Agent': 'Ivone-local-demo' }, signal: AbortSignal.timeout(20000) });
+if (!response.ok) throw new Error(`Release lookup failed: ${response.status}`);
+const release = await response.json();
+const asset = release.assets.find(asset => asset.name === 'cloudflared-windows-amd64.exe');
+if (!asset) throw new Error('Official Windows binary unavailable');
+const expected = asset.digest?.replace(/^sha256:/, '') ?? release.body.match(/cloudflared-windows-amd64\.exe:\s*([a-f0-9]{64})/i)?.[1];
+if (!/^[a-f0-9]{64}$/i.test(expected || '')) throw new Error('Official checksum unavailable; download refused');
+const binary = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(60000) });
+if (!binary.ok) throw new Error(`Download failed: ${binary.status}`);
+const bytes = Buffer.from(await binary.arrayBuffer());
+const digest = createHash('sha256').update(bytes).digest('hex');
+if (digest !== expected.toLowerCase()) throw new Error('Checksum mismatch; binary rejected');
+mkdirSync('test-results', { recursive: true });
+writeFileSync('test-results/cloudflared.exe', bytes);
+console.log(`Official cloudflared ${release.tag_name}: ${bytes.length} bytes, SHA-256 verified.`);

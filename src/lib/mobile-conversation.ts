@@ -265,8 +265,8 @@ export function transition(current: State, input: string, snapshot: Snapshot): R
           v.items.splice(state.index, 1, ...parsed.items); return readyFinance(draft, snapshot);
         }
         const proposed = parsed.items[0];
-        if (proposed?.unitCents !== null || proposed?.priceQuestion !== undefined) v.items[state.index] = proposed;
-        else { item.productName = proposed?.productName || text; item.quantity = /^(?:\d+|um|uma|dois|duas|tr[eê]s|quatro|cinco)\s/i.test(text) ? proposed.quantity : 0; item.unitCents = null; }
+        if (proposed && (proposed.unitCents !== null || proposed.priceQuestion !== undefined)) v.items[state.index] = proposed;
+        else { item.productName = proposed?.productName || text; item.quantity = /^(?:\d+|um|uma|dois|duas|tr[eê]s|quatro|cinco)\s/i.test(text) ? proposed?.quantity ?? 0 : 0; item.unitCents = null; }
         return readyFinance(draft, snapshot);
       }
       if (state.step === 'quantity') {

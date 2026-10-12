@@ -1,0 +1,41 @@
+import { readFileSync, mkdirSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+const access = JSON.parse(readFileSync('test-results/demo-access.json', 'utf8'));
+const browser = await chromium.launch({ headless: true, channel: 'msedge' });
+try {
+  assert.equal((await fetch(access.origin + '/api/operations')).status, 403);
+  const context = await browser.newContext({ viewport: { width: 393, height: 852 }, isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1', timezoneId: 'America/Sao_Paulo' });
+  const page = await context.newPage();
+  const errors: string[] = []; const requests: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('request', req => { if (req.url().includes('/api/')) requests.push(req.url()); });
+  await page.goto(access.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor({ timeout: 30000 });
+  assert.equal(await page.getByPlaceholder('PIN de 4 números').count(), 0);
+  assert.equal(await page.locator('nav, .chat-feed input, .chat-feed select, .chat-feed textarea').count(), 0);
+  assert.equal(await page.evaluate(() => window.isSecureContext), true);
+  await page.getByText(/Teste local · dados fictícios/).waitFor();
+  const say = async (text: string) => {
+    await page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled'));
+    await page.getByLabel('Mensagem', { exact: true }).fill(text);
+    await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled'));
+  };
+  await say('Vendi dois perfumes pra Maria por 300 reais, ela pagou 100 e ficou devendo 200.');
+  await page.getByRole('button', { name: 'Confirmar', exact: true }).waitFor();
+  assert.match(await page.locator('.chat-summary-text').last().innerText(), /200,00/);
+  await say('Confirmar');
+  assert.match(await page.locator('.chat-bubble p').last().innerText(), /Anotado com carinho/);
+  await say('Quanto a Maria deve?');
+  assert.match(await page.locator('.chat-bubble p').last().innerText(), /200,00/);
+  assert.ok(requests.every(url => url.startsWith(access.origin + '/api/')));
+  const secured = (await context.cookies()).find(cookie => cookie.name === '__Host-ivone_demo');
+  assert.ok(secured?.secure && secured.httpOnly && secured.sameSite === 'Strict');
+  for (const method of ['get', 'post'] as const) assert.equal((await context.request[method](access.origin + '/api/backup')).status(), 404);
+  assert.equal((await context.request.get(access.origin + '/src/main.tsx')).status(), 404);
+  assert.deepEqual(errors, []);
+  mkdirSync('test-results/demo', { recursive: true });
+  await page.screenshot({ path: 'test-results/demo/mobile.png' });
+  console.log('PASS HTTPS mobile: direct protected fictional chat, confirmed partial sale and real demo balance; no production requests or backup routes');
+} finally { await browser.close(); }
