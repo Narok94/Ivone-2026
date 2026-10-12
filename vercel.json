@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    { "source": "/manifest-20261012-1.webmanifest", "headers": [
+      { "key": "Cache-Control", "value": "no-cache" },
+      { "key": "Content-Type", "value": "application/manifest+json" }
+    ] }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
