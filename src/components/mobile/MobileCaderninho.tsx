@@ -1,14 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ArrowUp } from 'lucide-react';
 import { ChatFrame } from './ChatFrame';
 import { useData } from '../../contexto/DataContext';
 import { apiFetch, ApiError } from '../../lib/api';
 import { readPending } from '../../lib/pending-operation';
 import { clientBalance, currency, type FinancialOperation } from '../../lib/finance';
-import { clientFields, clientSummary, searchReply, resumeClient, transition, type Action, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
+import { clientFields, clientMenuChoices, clientSummary, searchReply, resumeClient, transition, type Action, type ClientData, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
 import { normalize } from '../../lib/conversation';
+import { ClientForm } from '../forms/ClientForm';
+import { Modal } from '../common/Modal';
+import { Button } from '../common';
+import './client-modal.css';
 
-type Message = { id: number; text: string; own?: boolean; summary?: string };
+type Message = { id: number; text: string; own?: boolean; summary?: string; tone?: 'success' | 'error' };
 export default function MobileCaderninho() {
   const data = useData(); const { user, refreshData, commitOperation, logout, isRefreshing, dataError } = data;
   const clientKey = `ivone_pending_client:${user!.id}`; const restoreKey = `ivone_pending_restore:${user!.id}`;
@@ -29,14 +33,29 @@ export default function MobileCaderninho() {
   const [reply, setReply] = useState<Reply>(initial); const current = useRef(reply);
   const [messages, setMessages] = useState<Message[]>([{ id: 0, text: reply.text }]);
   const [input, setInput] = useState(''); const [working, setWorking] = useState(false);
+  const [clientForm, setClientForm] = useState<Extract<State, { type: 'clientForm' }> | null>(null);
+  const dirty = useRef(false); const savingClient = useRef(false);
+  const modalPending = useRef<ClientRequest | null>(null); const [pendingSave, setPendingSave] = useState(false);
+  const [discard, setDiscard] = useState(false);
+  useEffect(() => { if (discard) { const box = document.querySelector<HTMLElement>('.client-discard-confirm'); box?.scrollIntoView({ block: 'nearest' }); box?.querySelector<HTMLButtonElement>('button')?.focus(); } }, [discard]);
+  function closeClientForm() {
+    if (savingClient.current || modalPending.current) return;
+    if (dirty.current && !discard) { setDiscard(true); return; }
+    if (discard) { setDiscard(false); return; }
+    cancelClientForm();
+  }
+  function cancelClientForm() { setClientForm(null); setDiscard(false); dirty.current = false; apply(response({ type: 'idle' }, 'Cancelei o formulário. Nenhum dado foi salvo.')); }
   const busy = useRef(false); const sequence = useRef(1); const attachment = useRef<HTMLInputElement>(null);
   const snapshot = (): Snapshot => ({ clients: data.clients, sales: data.sales, payments: data.payments, remoteSearch: true });
   async function search(query: string, offset = 0) {
     const result = await (await apiFetch(`/api/clients?q=${encodeURIComponent(query)}&offset=${offset}`)).json();
     data.rememberClients(result.clients); return result;
   }
-  const append = (text: string, own = false, summary?: string) => setMessages(old => [...old, { id: sequence.current++, text, own, summary }]);
-  function apply(next: Reply) { current.current = next; setReply(next); if (next.text) append(next.text, false, next.summary); }
+  const append = (text: string, own = false, summary?: string, tone?: Message['tone']) => setMessages(old => [...old, { id: sequence.current++, text, own, summary, tone }]);
+  function apply(next: Reply, tone?: Message['tone']) {
+    next = { ...next, state: { ...next.state, selectedClientId: next.state.selectedClientId ?? (next.state.type === 'finance' ? next.state.draft.value.clientId : undefined) ?? current.current.state.selectedClientId } };
+    current.current = next; setReply(next); if (next.text) append(next.text, false, next.summary, tone);
+  }
   const response = (state: State, text: string, choices: string[] = []): Reply => ({ state, text, choices });
   const balanceLabel = (fresh: Snapshot, id: string) => { const balance = clientBalance(fresh.sales, fresh.payments, id); return `${balance >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(balance))}`; };
   async function backup() {
@@ -48,7 +67,11 @@ export default function MobileCaderninho() {
   async function checkClient(request: ClientRequest): Promise<Reply> {
     if (request.mode === 'create') await search(request.data.fullName);
     const fresh = await refreshData();
-    const equal = (person: typeof fresh.clients[number]) => clientFields.every(([field]) => (person[field] ?? '') === (request.data[field] ?? '').trim());
+    if (request.id) {
+      const people = await (await apiFetch(`/api/clients?id=${request.id}`)).json();
+      data.rememberClients(people); fresh.clients = [...fresh.clients.filter(c => c.id !== request.id), ...people];
+    }
+    const equal = (person: typeof fresh.clients[number]) => clientFields.every(([field]) => (person[field] ?? '') === (field === 'fullName' ? request.data[field].trim() : request.data[field] ?? ''));
     const found = request.mode === 'create' ? fresh.clients.filter(c => !request.beforeIds.includes(c.id) && equal(c)) : fresh.clients.filter(c => c.id === request.id && equal(c));
     const deleted = request.mode === 'delete' && !fresh.clients.some(c => c.id === request.id);
     if (found.length === 1 || deleted) {
@@ -59,8 +82,57 @@ export default function MobileCaderninho() {
     }
     return response({ type: 'pendingClient', request }, 'Ainda não consegui comprovar essa confirmação. Não vou reenviar o cadastro para evitar duplicação. Consulte novamente; se persistir, será necessária verificação pelo responsável.', ['Verificar resultado']);
   }
+  async function saveModalClient(values: ClientData) {
+    if (!clientForm || savingClient.current) return;
+    savingClient.current = true;
+    try {
+      let request = modalPending.current;
+      if (request) {
+        const result = await checkClient(request);
+        if (result.state.type !== 'pendingClient') {
+          apply({ ...result, text: `${request.mode === 'edit' ? `Dados de ${request.data.fullName} atualizados` : `Cliente ${request.data.fullName} cadastrado`} com sucesso!${request.resume ? '\n' + result.text : ''}` });
+          modalPending.current = null; setPendingSave(false); setClientForm(null); dirty.current = false; return;
+        }
+        throw new Error('Ainda não consegui comprovar o salvamento. Consulte novamente; não vou repetir a gravação.');
+      }
+      if (!request) {
+        const matches = await search(values.fullName);
+        const changedName = !clientForm.original || normalize(clientForm.original.fullName) !== normalize(values.fullName);
+        if (changedName && matches.clients.some((c: any) => c.id !== clientForm.original?.id && normalize(c.fullName) === normalize(values.fullName))) throw new Error('Já existe uma cliente com esse nome. Confira o cadastro ou informe um nome que permita distinguir as pessoas.');
+        request = { mode: clientForm.original ? 'edit' : 'create', data: values, id: clientForm.original?.id, beforeIds: matches.clients.map((c: any) => c.id), resume: clientForm.resume };
+      }
+      modalPending.current = request; sessionStorage.setItem(clientKey, JSON.stringify(request));
+      try {
+        const saved = await (await apiFetch(request.id ? `/api/clients?id=${request.id}` : '/api/clients', { method: request.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...values, conversational: true, confirmed: true, ...(clientForm.original ? { expected: clientForm.original } : {}) }) })).json();
+        data.rememberClients([saved]);
+        sessionStorage.removeItem(clientKey); modalPending.current = null; setPendingSave(false);
+        const next = resumeClient(request, saved, snapshot());
+        apply({ ...next, text: `${request.mode === 'edit' ? `Dados de ${saved.fullName} atualizados` : `Cliente ${saved.fullName} cadastrado`} com sucesso!${request.resume ? '\n' + next.text : ''}` }, 'success');
+        setClientForm(null); dirty.current = false;
+      } catch (error) {
+        if (error instanceof ApiError && [400, 404, 409, 422].includes(error.status)) {
+          if (pendingSave && error.status === 409) {
+            const recovered = await checkClient(request);
+            if (recovered.state.type !== 'pendingClient') { apply(recovered); modalPending.current = null; setPendingSave(false); setClientForm(null); return; }
+          }
+          sessionStorage.removeItem(clientKey); modalPending.current = null; setPendingSave(false); throw error;
+        }
+        setPendingSave(true);
+        throw new Error('Não consegui confirmar a resposta do salvamento. Seus dados continuam aqui. Toque em Verificar salvamento para consultar sem repetir a gravação.');
+      }
+    } finally { savingClient.current = false; }
+  }
   async function execute(action: Action, before: State) {
-    if (action.type === 'searchClients') { apply(searchReply(action.selection, await search(action.query, action.offset))); return; }
+    if (action.type === 'openClientForm') { dirty.current = false; setDiscard(false); setClientForm(action.form); return; }
+    if (action.type === 'searchClients') {
+      const result = await search(action.query, action.offset);
+      if (result.clients.length === 1 && !result.hasMore && !result.uncertain) {
+        const fresh = await refreshData();
+        const next = transition({ ...action.selection, candidates: result.clients }, '1', { ...fresh, remoteSearch: true });
+        apply(next); if (next.action) await execute(next.action, before);
+      } else apply(searchReply(action.selection, result));
+      return;
+    }
     if (action.type === 'checkDuplicate') {
       const result = await search(action.client.data.fullName);
       const exact = result.clients.filter((c: any) => normalize(c.fullName) === normalize(action.client.data.fullName));
@@ -76,7 +148,7 @@ export default function MobileCaderninho() {
       apply(response({ type: 'pendingFinancial', operation }, 'Conferindo sua confirmação…'));
       try {
         const result = await commitOperation(operation); const name = data.clients.find(c => c.id === result.clientId)?.fullName ?? 'Cliente';
-        apply(response({ type: 'idle' }, `${result.replayed ? 'Já estava salvo; não dupliquei.' : operation.kind.startsWith('delete_') ? 'Lançamento excluído.' : operation.kind.startsWith('edit_') ? 'Lançamento atualizado.' : 'Anotado com carinho!'}\n${name}\n${result.balanceCents >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(result.balanceCents))}`));
+        apply(response({ type: 'idle', selectedClientId: operation.clientId }, `${result.replayed ? 'Já estava salvo; não dupliquei.' : operation.kind.startsWith('delete_') ? 'Lançamento excluído.' : operation.kind.startsWith('edit_') ? 'Lançamento atualizado.' : 'Anotado com carinho!'}\n${name}\n${result.balanceCents >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(result.balanceCents))}`, clientMenuChoices), 'success');
       } catch (e) {
         if (e instanceof ApiError && [400, 404, 422].includes(e.status) && draft) apply({ ...transition(before, 'Corrigir', snapshot()), text: `${e.message}\nO que devo corrigir?` });
         else apply(response({ type: 'pendingFinancial', operation }, 'A confirmação foi enviada, mas não consegui comprovar o resultado. Vou usar o mesmo identificador, sem duplicar. Não comece outra operação ainda.', ['Verificar resultado']));
@@ -124,7 +196,7 @@ export default function MobileCaderninho() {
     if (text === 'Anexar backup') { attachment.current?.click(); return; }
     busy.current = true; setWorking(true); setInput(''); append(text, true); const before = current.current.state;
     try { const fresh = await refreshData(); const next = transition(before, text, { ...fresh, remoteSearch: true }); apply(next); if (next.action) await execute(next.action, before); }
-    catch (e: any) { apply(response(before, e.message || 'Não consegui atualizar. Nenhuma nova confirmação foi enviada.', current.current.choices)); }
+    catch (e: any) { apply(response(before, e.message || 'Não consegui atualizar. Nenhuma nova confirmação foi enviada.', current.current.choices), 'error'); }
     finally { busy.current = false; setWorking(false); }
   }
   async function attach(file: File) {
@@ -142,13 +214,20 @@ export default function MobileCaderninho() {
     finally { busy.current = false; setWorking(false); }
   }
   const blocked = reply.state.type === 'blocked';
-  return <ChatFrame revision={`${messages.length}:${working}`} actions={<button disabled={working || reply.state.type !== 'idle'} onClick={() => void send('Sair')}>Sair</button>} footer={<>
+  return <><div inert={Boolean(clientForm)} aria-hidden={clientForm ? true : undefined}><ChatFrame revision={`${messages.length}:${working}`} actions={<button disabled={working || reply.state.type !== 'idle'} onClick={() => void send('Sair')}>Sair</button>} footer={<>
     <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(input); }}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Converse com seu Caderninho…" aria-label="Mensagem" maxLength={2000} autoComplete="off" disabled={working || blocked} /><button type="submit" aria-label="Enviar mensagem" disabled={!input.trim() || working || blocked}><ArrowUp size={22} /></button></form>
     {reply.state.type === 'attachment' && <input ref={attachment} hidden aria-label="Arquivo de backup" type="file" accept=".json" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void attach(file); }} />}
     <p className="chat-footer-note">{user?.username === 'Teste local fictício' ? 'Teste local · dados fictícios · só salvo após confirmar.' : 'Só anoto depois da sua confirmação.'}</p>
   </>}>
     {dataError && <div className="chat-bubble" role="alert"><p>{dataError}</p><button disabled={working} onClick={() => void send('Verificar resultado')}>Tentar atualizar</button></div>}
-    {messages.map(message => <div key={message.id} className={`chat-bubble ${message.own ? 'chat-own' : ''} ${message.summary ? 'chat-conversation-summary' : ''}`}><p>{message.text}</p>{message.summary && <p className="chat-summary-text">{message.summary}</p>}<span className="chat-bubble-caption">{message.own ? 'Você ✓✓' : 'Caderninho'}</span></div>)}
+    {messages.map(message => <div key={message.id} className={`chat-bubble ${message.own ? 'chat-own' : ''} ${message.summary ? 'chat-conversation-summary' : ''} ${message.tone ? `chat-${message.tone}` : ''}`}><p>{message.text}</p>{message.summary && <p className="chat-summary-text">{message.summary}</p>}<span className="chat-bubble-caption">{message.own ? 'Você ✓✓' : 'Caderninho'}</span></div>)}
     {!!reply.choices.length && <div className="chat-bubble chat-conversation-options" aria-label="Respostas disponíveis"><div className="chat-client-options">{reply.choices.map((choice, index) => <button key={`${index}:${choice}`} data-choice={choice} disabled={working || isRefreshing || blocked} onClick={() => void send(choice)}>{choice}</button>)}</div></div>}
-  </ChatFrame>;
+  </ChatFrame></div>
+    <Modal isOpen={Boolean(clientForm)} clientMode onClose={closeClientForm} title={clientForm?.original ? 'Editar cliente' : 'Cadastrar cliente'}>
+      {clientForm && <>
+        {discard && <div role="alertdialog" aria-label="Descartar alterações" className="client-discard-confirm"><p>Há alterações não salvas. Deseja descartá-las?</p><Button type="button" onClick={cancelClientForm}>Descartar alterações</Button><Button type="button" variant="secondary" onClick={() => setDiscard(false)}>Continuar preenchendo</Button></div>}
+        <div inert={discard || undefined}><ClientForm client={clientForm.original} initialData={clientForm.data} onDone={() => {}} onSave={saveModalClient} onCancel={closeClientForm} onDirtyChange={value => { dirty.current = value; }} pendingSave={pendingSave} /></div>
+      </>}
+    </Modal>
+  </>;
 }

@@ -2,6 +2,7 @@ import { requireSession } from '../server/lib/session.js';
 import { clientRow, FinancialError, withFinancialLock } from '../server/lib/financial.js';
 import { pool } from './db.js';
 import { searchClients } from '../server/lib/client-search.js';
+import { clientFields, validateClientData } from '../src/lib/client-fields.js';
 export default async function handler(req: any, res: any) {
   if (!await requireSession(req, res)) return;
   const id = req.query.id ?? req.params?.id;
@@ -14,11 +15,18 @@ export default async function handler(req: any, res: any) {
     const c = req.body;
     if (req.method === 'DELETE' && c?.confirmed !== true) throw new FinancialError('Confirme a exclusão da cliente e de seus registros relacionados.');
     if (req.method !== 'DELETE' && (typeof c?.fullName !== 'string' || !c.fullName.trim() || c.fullName.length > 300)) throw new FinancialError('Informe o nome da cliente.');
+    if (c?.conversational === true && ['POST', 'PUT'].includes(req.method)) { try { validateClientData(Object.fromEntries(clientFields.map(([field]) => [field, c[field] ?? ''])) as any); } catch (e) { throw new FinancialError(e instanceof Error ? e.message : 'Confira os campos do cadastro.'); } }
     const result = await withFinancialLock(pool, async db => {
-      if (req.method === 'POST' && c.conversational === true) {
+      if (['POST', 'PUT'].includes(req.method) && c.conversational === true) {
         if (c.confirmed !== true) throw new FinancialError('Confirme o cadastro antes de salvar.');
-        const duplicate = (await db.query('SELECT id FROM clientes WHERE public.ivone_client_name(full_name)=public.ivone_client_name($1) LIMIT 1', [c.fullName])).rows[0];
+        const duplicate = (await db.query('SELECT id FROM clientes WHERE public.ivone_client_name(full_name)=public.ivone_client_name($1) AND ($2::uuid IS NULL OR (id<>$2::uuid AND EXISTS (SELECT 1 FROM clientes original WHERE original.id=$2::uuid AND public.ivone_client_name(original.full_name)<>public.ivone_client_name($1)))) LIMIT 1', [c.fullName, req.method === 'PUT' ? id : null])).rows[0];
         if (duplicate) throw new FinancialError('Já existe uma cliente com esse nome. Consulte o cadastro antes de criar outra.', 409);
+        if (req.method === 'PUT' && c.expected) {
+          const row = (await db.query('SELECT * FROM clientes WHERE id=$1', [id])).rows[0];
+          if (!row) throw new FinancialError('Cliente não encontrada.', 404);
+          const person = clientRow(row);
+          if (!clientFields.every(([field]) => (person[field] ?? '') === (c.expected[field] ?? ''))) throw new FinancialError('Esse cadastro mudou enquanto você editava. Reabra o formulário para conferir os dados atuais.', 409);
+        }
       }
       if (req.method === 'DELETE') {
         // Conversational deletions must never cascade into financial history.

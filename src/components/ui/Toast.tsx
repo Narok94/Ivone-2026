@@ -13,10 +13,10 @@ export const Toast: FC<ToastProps> = ({ message, onClose }) => {
   }, [onClose]);
 
   return (
-    <div className="fixed top-24 right-6 bg-gradient-to-r from-pink-500 to-rose-500 text-white py-3 px-5 rounded-2xl shadow-lg flex items-center justify-between z-50 animate-slide-in">
+    <div role="status" className="fixed top-24 right-6 max-w-[calc(100vw-3rem)] bg-[#edf7ef] border border-[#bedbc4] text-[#285d3c] py-3 px-5 rounded-2xl shadow-lg flex items-center justify-between z-50 animate-slide-in">
       <SparklesIcon className="w-5 h-5 mr-3"/>
       <p className="font-semibold">{message}</p>
-      <button onClick={onClose} className="ml-4 text-xl font-semibold leading-none hover:text-pink-100">&times;</button>
+      <button aria-label="Fechar mensagem" onClick={onClose} className="ml-4 min-h-11 min-w-11 text-xl font-semibold leading-none">&times;</button>
     </div>
   );
 };

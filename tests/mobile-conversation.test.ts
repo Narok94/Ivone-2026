@@ -5,6 +5,28 @@ import { parseChatSale, parseChatDate, transition, type Reply, type Snapshot, ty
 const maria = { id: '00000000-0000-4000-8000-000000000001', fullName: 'Maria', phone: '', email: '', cpf: '', cep: '', street: '', number: '', complement: '', neighborhood: '', city: '', state: '', observation: '' } satisfies Client;
 const snapshot: Snapshot = { clients: [maria], sales: [], payments: [] };
 const idle: State = { type: 'idle' };
+
+test('client menu preserves selection, consumes a complete sale and writes only on confirmation', () => {
+  const data = { ...snapshot, clients: [maria, { ...maria, id: 'other', fullName: 'Maria Silva' }] };
+  let r = transition(idle, 'Maria', data); assert.equal(r.state.type, 'choose');
+  r = transition(r.state, '2', data); assert.equal(r.state.selectedClientId, 'other');
+  assert.deepEqual(r.choices, ['Nova venda', 'Ver saldo devedor', 'Extrato', 'Registrar recebimento', 'Editar cadastro']);
+  r = transition(r.state, 'Nova venda', data); assert.equal(r.state.type, 'finance');
+  r = transition(r.state, '2 perfumes a 150 cada, ela pagou 100', data);
+  assert.equal(r.action, undefined); assert.match(r.summary!, /Maria Silva/); assert.match(r.summary!, /300,00/); assert.match(r.summary!, /100,00/);
+  assert.ok(r.choices.includes('Confirmar venda')); assert.equal(transition(r.state, 'Confirmar venda', data).action?.type, 'financial');
+  assert.equal(transition(r.state, 'Cancelar', data).action, undefined);
+});
+
+test('balance queries and missing balance clients never offer registration or mutate the snapshot', () => {
+  const before = structuredClone(snapshot);
+  for (const text of ['Quanto a Maria deve?', 'Saldo da Maria']) {
+    const r = transition(idle, text, { ...snapshot, remoteSearch: true });
+    assert.equal(r.action?.type, 'searchClients'); if (r.action?.type === 'searchClients') assert.equal(r.action.query, 'Maria');
+  }
+  const r = transition({ type: 'idle', selectedClientId: maria.id }, 'Quanto falta pagar?', snapshot);
+  assert.match(r.text, /Saldo pendente/); assert.equal(r.action, undefined); assert.deepEqual(snapshot, before);
+});
 test('guided product names overlapping query keywords keep a valid draft and ask for quantity', () => {
   let r = transition(idle, 'Nova venda', snapshot);
   r = transition(r.state, 'Maria', snapshot);

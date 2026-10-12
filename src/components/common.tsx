@@ -21,11 +21,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export const Button: React.FC<ButtonProps> = ({ children, className = '', variant = 'primary', ...props }) => {
-  const baseClasses = 'py-2 px-5 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 transform active:scale-95';
+  const baseClasses = 'min-h-11 py-2 px-5 rounded-2xl transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   const variantClasses = {
-    primary: 'bg-gradient-to-br from-[#e91e63] to-[#c2185b] text-white font-black shadow-[0_8px_20px_rgba(233,30,99,0.25)] hover:shadow-[0_12px_25px_rgba(233,30,99,0.35)] hover:-translate-y-0.5 focus:ring-[#e91e63]',
-    secondary: 'bg-rose-50 text-[#e91e63] hover:bg-rose-100 focus:ring-[#e91e63] font-black border border-rose-100/50',
-    danger: 'bg-red-500 text-white hover:bg-red-600 focus:ring-red-500 font-black shadow-md hover:shadow-lg',
+    primary: 'bg-[#b73565] text-white font-bold shadow-md shadow-rose-200 hover:bg-[#98284f] focus:ring-[#853b55]',
+    secondary: 'bg-[#fff1f5] text-[#853b55] hover:bg-rose-100 focus:ring-[#853b55] font-bold border border-[#e3b8c7]',
+    danger: 'bg-[#fff0f0] text-[#a3313f] hover:bg-red-100 focus:ring-red-700 font-bold border border-[#e8b6bc]',
   };
 
   return (

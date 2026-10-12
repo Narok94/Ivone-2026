@@ -45,7 +45,7 @@ test('A–F/M/N: indexed, bounded searches with 5,000 fictitious clients and exp
    reply=transition(reply.state,'2',snapshot);assert.equal(reply.state.type,'finance');if(reply.state.type==='finance')assert.equal(reply.state.draft.value.candidates[0].fullName,'Bruna Ferreira');
   });
   await t.test('G/H/L registration reuses supplied fields, duplicate guard and cancellation',async()=>{
-   const reply=transition({type:'idle'},'Cadastre uma cliente chamada Bruna Nova, telefone 11999998888, e-mail bruna@example.test, rua Rua Ficticia, cidade Santos, estado SP',snapshot);assert.equal(reply.action?.type,'checkDuplicate');if(reply.state.type==='client'){assert.equal(reply.state.data.fullName,'Bruna Nova');assert.equal(reply.state.data.phone,'11999998888');assert.equal(reply.state.data.email,'bruna@example.test');assert.equal(reply.state.data.street,'Rua Ficticia');assert.equal(reply.state.data.city,'Santos');assert.equal(reply.state.data.state,'SP');}
+   const reply=transition({type:'idle'},'Cadastre uma cliente chamada Bruna Nova, telefone 11999998888, e-mail bruna@example.test, rua Rua Ficticia, cidade Santos, estado SP',snapshot);assert.equal(reply.action,undefined);assert.equal(reply.summary,undefined);assert.deepEqual(reply.choices,['Sim','Cancelar']);if(reply.state.type==='clientForm'){assert.equal(reply.state.data.fullName,'Bruna Nova');assert.equal(reply.state.data.phone,'11999998888');assert.equal(reply.state.data.email,'bruna@example.test');assert.equal(reply.state.data.street,'Rua Ficticia');assert.equal(reply.state.data.city,'Santos');assert.equal(reply.state.data.state,'SP');}assert.equal(transition(reply.state,'Sim',snapshot).action?.type,'openClientForm');
    assert.equal(transition(reply.state,'Cancelar',snapshot).action,undefined);
    const req:any={method:'POST',headers:{host:'app.test',origin:'http://app.test'},query:{},body:{fullName:'brúna costa',confirmed:true,conversational:true}};
    const sessionResponse=res();const session=await createSession(req,sessionResponse,{id:99,username:'Ivone'});req.headers.cookie=sessionResponse.headers['Set-Cookie'].split(';')[0];req.headers['x-csrf-token']=session.csrfToken;
@@ -55,9 +55,9 @@ test('A–F/M/N: indexed, bounded searches with 5,000 fictitious clients and exp
   });
   await t.test('I/J/K/O missing-client signup preserves complete sale and requires separate financial confirmation',async()=>{
    let reply=await resolve(transition({type:'idle'},'Vendi dois perfumes para Bruna Nova por 300 reais, ela pagou 100 e ficou devendo 200.',snapshot));assert.equal(reply.state.type,'missingClient');assert.match(reply.text,/Não encontrei Bruna Nova/);assert(!reply.choices.some(c=>c.includes('Pessoa')));
-   reply=transition(reply.state,'Sim',snapshot);assert.equal(reply.action?.type,'checkDuplicate');assert.equal(reply.state.type,'client');
-   reply=transition(reply.state,'Confirmar',snapshot);assert.equal(reply.action?.type,'client');if(reply.action?.type!=='client')throw new Error('Missing client action');
-   const request=reply.action.request;const person={...request.data,id:'00000000-0000-4000-8000-000000009999'};
+   reply=transition(reply.state,'Sim',snapshot);assert.equal(reply.action?.type,'openClientForm');assert.equal(reply.state.type,'clientForm');
+   if(reply.state.type!=='clientForm')throw new Error('Missing form state');
+   const request={mode:'create' as const,data:reply.state.data,resume:reply.state.resume,beforeIds:[]};const person={...request.data,id:'00000000-0000-4000-8000-000000009999'};
    reply=resumeClient(request,person,snapshot);assert.equal(reply.action,undefined);assert.equal(reply.state.type,'finance');assert.match(reply.summary!,/2 perfumes/);assert.match(reply.summary!,/300,00/);assert.match(reply.summary!,/100,00/);assert.match(reply.summary!,/Bruna Nova/);
    assert.equal(transition(reply.state,'Cancelar',snapshot).action,undefined);assert.equal(transition(reply.state,'Confirmar',snapshot).action?.type,'financial');
   });

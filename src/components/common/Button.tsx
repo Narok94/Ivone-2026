@@ -6,14 +6,14 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button: FC<ButtonProps> = ({ children, variant = 'primary', className = '', ...props }) => {
     const variants = {
-        primary: 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-lg shadow-rose-200 hover:shadow-rose-300 hover:-translate-y-0.5',
-        secondary: 'bg-white text-rose-500 border-2 border-rose-100 hover:bg-rose-50',
-        danger: 'bg-rose-100 text-rose-600 hover:bg-rose-200',
+        primary: 'bg-[#b73565] text-white shadow-md shadow-rose-200 hover:bg-[#98284f]',
+        secondary: 'bg-[#fff1f5] text-[#853b55] border border-[#e3b8c7] hover:bg-rose-100',
+        danger: 'bg-[#fff0f0] text-[#a3313f] border border-[#e8b6bc] hover:bg-red-100',
     };
 
     return (
         <button 
-            className={`px-6 py-3 rounded-2xl font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
+            className={`min-h-11 px-6 py-3 rounded-2xl font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#853b55] disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${className}`}
             {...props}
         >
             {children}

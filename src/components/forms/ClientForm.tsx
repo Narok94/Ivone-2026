@@ -1,9 +1,11 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useEffect, useRef, useState } from 'react';
 import { useData } from '../../contexto/DataContext';
 import { Button, Input, TextArea } from '../common';
 import { Client } from '../../types';
+import { validateClientData, type ClientData } from '../../lib/client-fields';
 
-export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({ client, onDone }) => {
+export const ClientForm: FC<{ client?: Client | null; initialData?: ClientData; onDone: () => void; onSave?: (data: ClientData) => Promise<void>; onCancel?: () => void; onDirtyChange?: (dirty: boolean) => void; onBusyChange?: (busy: boolean) => void; pendingSave?: boolean }> = ({ client: existing, initialData, onDone, onSave, onCancel, onDirtyChange, onBusyChange, pendingSave }) => {
+    const client = existing ?? (initialData ? { ...initialData, id: '' } : undefined);
     const { addClient, updateClient } = useData();
     const [formData, setFormData] = useState({
         fullName: client?.fullName || '',
@@ -22,6 +24,14 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
     const [isCepLoading, setIsCepLoading] = useState(false);
     const [cepError, setCepError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [saveError, setSaveError] = useState('');
+    const baseline = useRef(JSON.stringify(formData));
+    const current = useRef(formData); current.current = formData;
+    const lookup = useRef(0);
+    const [addressProposal, setAddressProposal] = useState<Partial<ClientData> | null>(null);
+    useEffect(() => { onDirtyChange?.(JSON.stringify(formData) !== baseline.current); }, [formData, onDirtyChange]);
+    useEffect(() => { onBusyChange?.(isSubmitting); }, [isSubmitting, onBusyChange]);
+    useEffect(() => () => { lookup.current++; }, []);
 
     const capitalizeWords = (str: string): string => {
         if (!str) return '';
@@ -60,6 +70,8 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
             finalValue = formatCep(value);
         }
         setFormData(prev => ({ ...prev, [name]: finalValue }));
+        setSaveError('');
+        if (name === 'cep') { lookup.current++; setAddressProposal(null); setIsCepLoading(false); }
     };
 
     const handleCepBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
@@ -72,37 +84,32 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
 
         setIsCepLoading(true);
         setCepError('');
+        const request = ++lookup.current;
 
         try {
-            const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: AbortSignal.timeout(8000), credentials: 'omit', referrerPolicy: 'no-referrer' });
             if (!response.ok) throw new Error('Falha na busca');
             const data = await response.json();
+            if (request !== lookup.current || current.current.cep.replace(/\D/g, '') !== cep) return;
 
             if (data.erro) {
                 setCepError('CEP não encontrado.');
-                setFormData(prev => ({
-                    ...prev,
-                    street: '',
-                    neighborhood: '',
-                    city: '',
-                    state: '',
-                }));
             } else {
-                setFormData(prev => ({
-                    ...prev,
-                    street: data.logradouro,
-                    neighborhood: data.bairro,
-                    city: data.localidade,
-                    state: data.uf,
-                    complement: data.complemento || '',
-                }));
-                document.getElementById('number')?.focus();
+                const proposal: Partial<ClientData> = { street: data.logradouro || '', neighborhood: data.bairro || '', city: data.localidade || '', state: data.uf || '' };
+                const conflicts: Partial<ClientData> = {};
+                const blanks: Partial<ClientData> = {};
+                for (const [key, value] of Object.entries(proposal) as [keyof ClientData, string][]) {
+                    if (!value) continue;
+                    if (!current.current[key]) blanks[key] = value;
+                    else if (current.current[key] !== value) conflicts[key] = value;
+                }
+                setFormData(prev => ({ ...prev, ...blanks }));
+                setAddressProposal(Object.keys(conflicts).length ? conflicts : null);
             }
         } catch (error) {
-            setCepError('Erro ao buscar CEP. Verifique sua conexão.');
-            console.error(error);
+            if (request === lookup.current) setCepError('Não consegui consultar o CEP. Você pode preencher o endereço manualmente.');
         } finally {
-            setIsCepLoading(false);
+            if (request === lookup.current) setIsCepLoading(false);
         }
     };
 
@@ -115,22 +122,40 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         setIsSubmitting(true);
+        setSaveError('');
         try {
-            if(client){
-                await updateClient({ ...client, ...formData });
+            if (onSave) {
+                const valid = validateClientData(formData);
+                await onSave(valid);
+            } else if(existing){
+                await updateClient({ ...existing, ...formData });
             } else {
                 await addClient(formData);
             }
             onDone();
         } catch (error) {
-            console.error(error);
-            alert('Ocorreu um erro ao salvar o cliente. 🌸');
+            setSaveError(error instanceof Error ? error.message : 'Não consegui salvar. Confira os dados e tente novamente.');
         } finally {
             setIsSubmitting(false);
         }
     };
 
+    if (onSave) {
+        const locked = isSubmitting || pendingSave;
+        const input = (name: keyof ClientData, label: string, type = 'text') => <Input label={label} id={name} name={name} type={type} value={formData[name]} onChange={handleChange} onBlur={name === 'cep' ? handleCepBlur : undefined} required={name === 'fullName'} maxLength={name === 'fullName' ? 300 : name === 'cep' ? 9 : name === 'state' ? 2 : 1000} inputMode={['cep', 'cpf', 'number'].includes(name) ? 'numeric' : undefined} disabled={Boolean(locked)} />;
+        return <form onSubmit={handleSubmit} className="client-modal-form">
+            <fieldset disabled={Boolean(locked)}><legend>Dados pessoais</legend><div className="client-form-grid">{input('fullName', 'Nome Completo')}{input('phone', 'Telefone', 'tel')}{input('email', 'E-mail', 'email')}{input('cpf', 'CPF')}</div></fieldset>
+            <fieldset disabled={Boolean(locked)}><legend>Endereço</legend><div className="client-form-grid">{input('cep', 'CEP')}{input('street', 'Rua / Logradouro')}{input('number', 'Número')}{input('complement', 'Complemento')}{input('neighborhood', 'Bairro')}{input('city', 'Cidade')}{input('state', 'Estado (UF)')}</div>
+                {isCepLoading && <p role="status">Buscando endereço…</p>}{cepError && <p className="client-form-error" role="status">{cepError}</p>}
+                {addressProposal && <div className="client-address-proposal"><p>O CEP encontrou um endereço diferente. Deseja substituir os campos preenchidos?</p><p>{Object.values(addressProposal).join(' · ')}</p><Button type="button" onClick={() => { setFormData(prev => ({ ...prev, ...addressProposal })); setAddressProposal(null); }}>Usar endereço do CEP</Button><Button type="button" variant="secondary" onClick={() => setAddressProposal(null)}>Manter meu endereço</Button></div>}
+            </fieldset>
+            <fieldset disabled={Boolean(locked)}><legend>Informações adicionais</legend><TextArea label="Observações" id="observation" name="observation" maxLength={2000} value={formData.observation} onChange={handleChange} /></fieldset>
+            {saveError && <p role="alert" className="client-form-error">{saveError}</p>}
+            <div className="client-form-actions"><Button type="button" variant="secondary" onClick={onCancel} disabled={Boolean(locked)}>Cancelar</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando…' : pendingSave ? 'Verificar salvamento' : existing ? 'Salvar alterações' : 'Salvar cliente'}</Button></div>
+        </form>;
+    }
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <Input label="Nome Completo" id="fullName" name="fullName" value={formData.fullName} onChange={handleChange} />
@@ -178,6 +203,7 @@ export const ClientForm: FC<{ client?: Client | null; onDone: () => void }> = ({
             <Input label="CPF" id="cpf" name="cpf" value={formData.cpf} onChange={handleChange} />
             <TextArea label="Observação" id="observation" name="observation" value={formData.observation} onChange={handleChange} />
             <div className="flex justify-end pt-4">
+                {saveError && <p role="alert" className="text-rose-700">{saveError}</p>}
                 <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting ? (
                         <div className="flex items-center gap-2">
