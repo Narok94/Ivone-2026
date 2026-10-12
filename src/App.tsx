@@ -1,4 +1,5 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useEffect, useState } from 'react';
+import MobileCaderninho from './components/mobile/MobileCaderninho';
 import { useData } from './contexto/DataContext';
 import { IvoneLayout } from './components/layout/IvoneLayout';
 
@@ -34,6 +35,8 @@ const App: FC = () => {
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [editingSale, setEditingSale] = useState<Sale | null>(null);
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
+    const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px), (hover: none) and (pointer: coarse)').matches);
+    useEffect(() => { const query = window.matchMedia('(max-width: 767px), (hover: none) and (pointer: coarse)'); const change = () => setMobile(query.matches); query.addEventListener('change', change); return () => query.removeEventListener('change', change); }, []);
 
     const showToast = (message: string) => {
         setToast(message);
@@ -58,7 +61,9 @@ const App: FC = () => {
     };
 
     const handleNavigate = (view: View, clientId?: string) => {
-        if (clientId) setSelectedClientId(clientId);
+        setSelectedClientId(clientId ?? null);
+        setEditingSale(null);
+        setEditingPayment(null);
         navigate(view);
     };
 
@@ -88,6 +93,7 @@ const App: FC = () => {
     if (!user) {
         return <Login />;
     }
+    if (mobile && new URLSearchParams(window.location.search).get('modo') !== 'gestao') return <MobileCaderninho />;
 
     // Standard User View Logic
     return (

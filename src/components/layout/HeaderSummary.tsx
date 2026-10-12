@@ -3,6 +3,7 @@ import { useData } from '../../contexto/DataContext';
 import { View } from '../../types';
 import { UsersIcon, TrendingUpIcon, WalletIcon, ClockIcon } from '../ui/Icons';
 import { motion } from 'motion/react';
+import { sumMoney } from '../../lib/finance';
 
 interface HeaderSummaryProps {
     setActiveView: (view: View) => void;
@@ -18,7 +19,7 @@ const CountUp: FC<{ value: number; isCurrency?: boolean; duration?: number }> = 
         const animate = (timestamp: number) => {
             if (!startTime) startTime = timestamp;
             const progress = Math.min((timestamp - startTime) / duration, 1);
-            setCount(Math.floor(progress * value));
+            setCount(isCurrency ? (progress === 1 ? value : Math.round(progress * value * 100) / 100) : Math.floor(progress * value));
 
             if (progress < 1) {
                 animationFrame = requestAnimationFrame(animate);
@@ -27,7 +28,7 @@ const CountUp: FC<{ value: number; isCurrency?: boolean; duration?: number }> = 
 
         animationFrame = requestAnimationFrame(animate);
         return () => cancelAnimationFrame(animationFrame);
-    }, [value, duration]);
+    }, [value, duration, isCurrency]);
 
     if (isCurrency) {
         return <>{count.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</>;
@@ -36,11 +37,11 @@ const CountUp: FC<{ value: number; isCurrency?: boolean; duration?: number }> = 
 };
 
 export const HeaderSummary: FC<HeaderSummaryProps> = ({ setActiveView }) => {
-    const { clients, sales, payments } = useData();
+    const { clients, sales, payments, clientBalances } = useData();
     
-    const totalSalesValue = useMemo(() => sales.reduce((sum, s) => sum + s.total, 0), [sales]);
-    const totalReceived = useMemo(() => payments.reduce((sum, p) => sum + p.amount, 0), [payments]);
-    const totalPending = totalSalesValue - totalReceived;
+    const totalSalesValue = useMemo(() => sumMoney(sales.map(s => s.total)), [sales]);
+    const totalReceived = useMemo(() => sumMoney(payments.map(p => p.amount)), [payments]);
+    const totalPending = sumMoney([...clientBalances.values()].filter(balance => balance > 0));
 
     const summaryItems = [
         { title: 'Clientes', icon: UsersIcon, view: 'clients', color: 'from-[#9C27B0] to-[#7E57C2]', border: 'border-[#4A148C]', numericValue: clients.length },

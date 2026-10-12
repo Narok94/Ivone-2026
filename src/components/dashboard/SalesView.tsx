@@ -4,6 +4,7 @@ import { Card, Button, Input } from '../common';
 import { ArrowLeftIcon, ShoppingCartIcon, EditIcon, TrashIcon, UsersIcon } from '../ui/Icons';
 import { Client, Sale } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
+import { paymentAllocation } from '../../lib/finance';
 
 const groupSalesByMonth = (sales: Sale[]) => {
     const groups = sales.reduce((acc, sale) => {
@@ -25,29 +26,7 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [filter, setFilter] = useState('');
 
-    const salePaymentStatus = useMemo(() => {
-        if (!selectedClient) return new Map();
-
-        const statusMap = new Map<string, 'paid' | 'partial' | 'unpaid'>();
-        const clientSales = sales.filter(s => s.clientId === selectedClient.id);
-        const clientPayments = payments.filter(p => p.clientId === selectedClient.id);
-        const sortedSales = [...clientSales].sort((a, b) => new Date(a.saleDate).getTime() - new Date(b.saleDate).getTime());
-        
-        let totalPaid = clientPayments.reduce((sum, p) => sum + p.amount, 0);
-
-        for (const sale of sortedSales) {
-            if (totalPaid >= sale.total) {
-                statusMap.set(sale.id, 'paid');
-                totalPaid -= sale.total;
-            } else if (totalPaid > 0 && totalPaid < sale.total) {
-                statusMap.set(sale.id, 'partial');
-                totalPaid = 0;
-            } else {
-                statusMap.set(sale.id, 'unpaid');
-            }
-        }
-        return statusMap;
-    }, [sales, payments, selectedClient]);
+    const salePaymentStatus = useMemo(() => selectedClient ? paymentAllocation(sales, payments, selectedClient.id) : new Map<string, 'paid' | 'partial' | 'unpaid'>(), [sales, payments, selectedClient]);
 
 
     const filteredClients = useMemo(() => {
@@ -97,6 +76,7 @@ export const SalesView: FC<{ onEditSale: (sale: Sale) => void; showToast: (msg: 
                     </Button>
                 </div>
                 <h1 className="text-2xl font-bold text-rose-800 mb-4">Caderninho de Encomendas: {selectedClient.fullName}</h1>
+                <p className="text-xs text-gray-500 mb-4">As cores estimam o pagamento por ordem de venda. Os recebimentos são somados por cliente, sem parcelas individuais.</p>
                 <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2">
                     {clientSales.length > 0 ? groupedSales.map(([month, salesInMonth]) => (
                         <div key={month}>

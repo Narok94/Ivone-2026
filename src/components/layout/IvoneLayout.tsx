@@ -27,7 +27,8 @@ interface IvoneLayoutProps {
 }
 
 export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setActiveView, onBack, toast, setToast }) => {
-    const { logout, refreshData } = useData();
+    const { logout, refreshData, user } = useData();
+    const [restoring, setRestoring] = useState(false);
     const handleLogout = async () => {
         try { await logout(); }
         catch { setToast('Não foi possível encerrar a sessão. Tente novamente.'); }
@@ -53,6 +54,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
         try {
             const res = await apiFetch('/api/backup');
             const data = await res.json();
+            if (!data?.data || !data.counts || !['clients', 'sales', 'payments'].every(table => Array.isArray(data.data[table]) && data.data[table].length === data.counts[table])) throw new Error('Backup incompleto.');
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -60,40 +62,38 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
             a.download = `backup_ivone_${new Date().toISOString().split('T')[0]}.json`;
             a.click();
             URL.revokeObjectURL(url);
+            return data.fingerprint as string;
         } catch (e) {
             setToast('Erro ao realizar backup ❌');
+            return false;
         }
     };
 
     const handleRestore = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        if (!confirm('Isso irá apagar todos os dados atuais e substituir pelo backup. Continuar?')) {
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const content = JSON.parse(event.target?.result as string);
-                const res = await apiFetch('/api/backup', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(content)
-                });
-                
-                if (res.ok) {
-                    setToast('Backup restaurado com sucesso! ✨');
-                    refreshData();
-                } else {
-                    setToast('Erro ao restaurar backup ❌');
-                }
-            } catch (err) {
-                setToast('Arquivo inválido ❌');
-            }
-        };
-        reader.readAsText(file);
+        const file = e.target.files?.[0]; e.target.value = '';
+        if (!file || restoring) return;
+        setRestoring(true);
+        const key = `ivone_pending_restore:${user!.id}`;
+        try {
+            const content = JSON.parse(await file.text());
+            const data = content.data ?? content;
+            if (!Array.isArray(data.clients) || !Array.isArray(data.sales) || !Array.isArray(data.payments)) throw new Error('Arquivo incompleto: confira clientes, vendas e pagamentos.');
+            const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(data))))).map(byte => byte.toString(16).padStart(2, '0')).join('');
+            const pending = JSON.parse(sessionStorage.getItem(key) ?? 'null');
+            if (pending && pending.hash !== hash) throw new Error('Há uma restauração pendente. Escolha o mesmo arquivo para verificar seu resultado sem substituir os dados novamente.');
+            // Every attempt uses a fresh, verified backup, without changing its restore ID.
+            const backupFingerprint = await handleBackup();
+            if (!backupFingerprint) throw new Error('Não consegui gerar o backup recuperável. Nenhum dado será substituído.');
+            if (!pending) {
+                if (!confirm(`Um backup dos registros atuais foi baixado. A restauração substituirá clientes, vendas e pagamentos por ${data.clients.length} clientes, ${data.sales.length} vendas e ${data.payments.length} pagamentos. Usuários e configurações serão preservados. Confirmar?`)) return;
+            } else if (!confirm('Reenviar a mesma confirmação de restauração para verificar seu resultado, sem repetir a substituição?')) return;
+            const restoreId = pending?.restoreId ?? crypto.randomUUID();
+            sessionStorage.setItem(key, JSON.stringify({ restoreId, hash }));
+            await apiFetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data, confirmed: true, restoreId, backupFingerprint }) });
+            sessionStorage.removeItem(key); setToast('Backup restaurado com sucesso! ✨');
+            await refreshData();
+        } catch (error: any) { setToast(error.message || 'Não consegui concluir a restauração. Escolha o mesmo arquivo e tente novamente.'); }
+        finally { setRestoring(false); }
     };
 
     const mobileNavItems = [
@@ -109,6 +109,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 {/* Notebook Background effect for the whole center */}
                 <div className="absolute inset-0 bg-[#fdfdfd] shadow-2xl rounded-[2.5rem] paper-texture -z-10 border border-gray-300" />
                 
+                {new URLSearchParams(window.location.search).get('modo') === 'gestao' && <a href="/" className="md:hidden block text-center py-3 text-sm text-rose-700">Voltar ao Caderninho 🌷</a>}
                 {/* Header with Logo at Top Left */}
                 <header className="py-6 md:py-8 relative min-h-[100px] md:min-h-[140px] flex items-center justify-center z-50">
                     <div className="absolute left-0 top-2 md:top-4">
@@ -183,7 +184,7 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                                                         <span className="block text-sm font-bold text-gray-700">Subir Backup</span>
                                                         <span className="text-[10px] text-gray-400 font-medium tracking-tight">Restaurar de arquivo .json</span>
                                                     </div>
-                                                    <input type="file" accept=".json" onChange={handleRestore} className="hidden" />
+                                                    <input type="file" accept=".json" onChange={handleRestore} disabled={restoring} className="hidden" />
                                                 </label>
                                             </div>
                                         </div>

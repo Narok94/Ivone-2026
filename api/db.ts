@@ -6,14 +6,8 @@ dotenv.config();
 
 const rawConnectionString = (process.env as any).ivone_DATABASE_URL || process.env.IVONE_DATABASE_URL || process.env.DATABASE_URL || '';
 
-// Bypass pooler for direct connection and ensure schema=public
-const cleanUrl = rawConnectionString.replace('-pooler', '');
-let connectionString = cleanUrl;
-
-if (connectionString && !connectionString.includes('schema=')) {
-  const separator = connectionString.includes('?') ? '&' : '?';
-  connectionString += `${separator}schema=public`;
-}
+// Preserve the configured Neon connection, including its pooler and parameters.
+const connectionString = rawConnectionString;
 
 // Required for @neondatabase/serverless in Node environments
 if (typeof window === 'undefined') {
@@ -31,4 +25,7 @@ if (typeof window === 'undefined') {
 // Create pool lazily
 export const pool = new Pool({
   connectionString: connectionString || '',
+  connectionTimeoutMillis: 5000,
+  query_timeout: 10000,
 });
+pool.on('error', () => console.error('Database connection unavailable'));

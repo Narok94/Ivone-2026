@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export interface Session {
-  user: { id: string; username: string };
+  user: { id: string | number; username: string };
   csrfToken: string;
   expiresAt: number;
 }
@@ -30,6 +30,7 @@ async function command(parts: (string | number)[]) {
   if (parts[0] === 'DEL' && body.result !== 0 && body.result !== 1) throw new Error('Session storage unavailable');
   return body.result;
 }
+export { command as redisCommand };
 function useLocalStore() {
   if (process.env.AUTH_REDIS_REST_URL || process.env.AUTH_REDIS_REST_TOKEN) return false;
   // Memory is restricted to one local development/test process, never Vercel.
@@ -62,7 +63,8 @@ export async function readSession(req: Request): Promise<Session | null> {
   const key = keyFor(token);
   const raw = useLocalStore() ? localSessions.get(key) : await command(['GET', key]);
   const session: Session | undefined = typeof raw === 'string' ? JSON.parse(raw) : raw as Session | undefined;
-  if (!session || !session.user?.id || !session.user?.username || !/^[a-f0-9]{64}$/.test(session.csrfToken) || !(session.expiresAt > Date.now())) {
+  const validUser = session?.user && ((typeof session.user.id === 'string' && session.user.id.length > 0 && session.user.id.length <= 100) || (typeof session.user.id === 'number' && Number.isSafeInteger(session.user.id) && session.user.id > 0)) && typeof session.user.username === 'string' && session.user.username.length > 0 && session.user.username.length <= 100;
+  if (!session || !validUser || typeof session.csrfToken !== 'string' || !/^[a-f0-9]{64}$/.test(session.csrfToken) || !Number.isSafeInteger(session.expiresAt) || !(session.expiresAt > Date.now())) {
     if (useLocalStore()) localSessions.delete(key);
     return null;
   }

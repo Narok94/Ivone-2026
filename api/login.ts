@@ -1,6 +1,7 @@
 import { pool } from './db.js';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelRequest, VercelResponse } from '../server/lib/http.js';
 import { createSession, noCache, sameOrigin } from '../server/lib/session.js';
+import { allowLogin } from '../server/lib/login-limit.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   noCache(res);
@@ -13,8 +14,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (typeof username !== 'string' || !username || username.length > 100 || typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
     return res.status(400).json({ success: false, message: 'Usuário e PIN de 4 números são obrigatórios. 🌸' });
   }
-  let user: { id: string; username: string; pin: string };
+  let user: { id: string | number; username: string; pin: string };
   try {
+    if (!await allowLogin(req, username)) {
+      res.setHeader('Retry-After', '300');
+      return res.status(429).json({ success: false, message: 'Muitas tentativas. Aguarde alguns minutos para tentar novamente. 🌸' });
+    }
     const result = await pool.query('SELECT id, username, pin FROM usuarios WHERE username = $1', [username]);
     user = result.rows[0];
     if (!user || user.pin !== pin) return res.status(401).json({ success: false, message: 'Usuário ou PIN incorreto. 🌸' });

@@ -18,6 +18,8 @@ const { default: login } = await import('../api/login.ts');
 const { default: sessionHandler } = await import('../api/session.ts');
 const { default: logout } = await import('../api/logout.ts');
 const handlers = await Promise.all(['clients', 'sales', 'payments', 'backup'].map(async name => (await import(`../api/${name}.ts`)).default));
+const { default: operations } = await import('../api/operations.ts');
+const protectedHandlers = [...handlers, operations];
 const auth = await import('../server/lib/session.ts');
 
 function response() {
@@ -44,7 +46,7 @@ test('authentication, API authorization, CSRF, expiration and server-side logout
 
   await t.test('all business APIs reject every supported method before touching the database', async () => {
     pool.calls = [];
-    for (const handler of handlers) for (const method of ['GET', 'POST', 'PUT', 'DELETE']) {
+    for (const handler of protectedHandlers) for (const method of ['GET', 'POST', 'PUT', 'DELETE']) {
       const res = response();
       await handler(request(method), res);
       assert.equal(res.code, 401);
@@ -105,12 +107,12 @@ test('authentication, API authorization, CSRF, expiration and server-side logout
       const res = response();
       await handler(request('GET', cookie), res);
       assert.equal(res.code, 200);
-      assert.ok(Array.isArray(res.body) || res.body.version === '1.0');
+      assert.ok(Array.isArray(res.body) || res.body.version === '2.0');
     }
   });
   await t.test('all write APIs reject missing/wrong CSRF and cross-site origins before database calls', async () => {
     pool.calls = [];
-    for (const handler of [...handlers, logout]) for (const method of ['POST', 'PUT', 'DELETE']) {
+    for (const handler of [...protectedHandlers, logout]) for (const method of ['POST', 'PUT', 'DELETE']) {
       if (handler === logout && method !== 'POST') continue;
       for (const token of ['', 'a'.repeat(64)]) {
         const res = response();
@@ -138,7 +140,7 @@ test('authentication, API authorization, CSRF, expiration and server-side logout
     await logout(request('POST', cookie, csrf), res as any);
     assert.equal(res.body.success, true);
     assert.match(res.headers['set-cookie'], /Max-Age=0/);
-    for (const handler of [sessionHandler, ...handlers]) {
+    for (const handler of [sessionHandler, ...protectedHandlers]) {
       const blocked = response();
       await handler(request('GET', cookie), blocked as any);
       assert.equal(blocked.code, 401);

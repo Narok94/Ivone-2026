@@ -1,112 +1,46 @@
+import { createHash } from 'node:crypto';
 import { requireSession } from '../server/lib/session.js';
+import { FINANCIAL_LOCK, FinancialError } from '../server/lib/financial.js';
+import { insertBackup, readBackupRows, validateBackup } from '../server/lib/backup.js';
 import { pool } from './db.js';
-
-export default async function backupHandler(req: any, res: any) {
-  if (!await requireSession(req, res)) return;
-  if (req.method === 'GET') {
+export default async function handler(req: any, res: any) {
+  const session = await requireSession(req, res);
+  if (!session) return;
+  if (!['GET', 'POST'].includes(req.method)) return res.status(405).json({ message: 'Método não permitido.' });
+  let data: any, fingerprint: string;
+  if (req.method === 'POST') {
     try {
-      const [clients, sales, payments] = await Promise.all([
-        pool.query('SELECT * FROM clientes'),
-        pool.query('SELECT * FROM vendas'),
-        pool.query('SELECT * FROM pagamentos')
-      ]);
-
-      const backupData = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        data: {
-          clients: clients.rows,
-          sales: sales.rows,
-          payments: payments.rows
-        }
-      };
-
-      res.json(backupData);
-    } catch (error: any) {
-      res.status(500).json({ success: false, message: 'Erro ao gerar backup', error: 'Não foi possível concluir a operação.' });
-    }
-  } else if (req.method === 'POST') {
-    const body = req.body;
-    const restoreData = body.data || body; // Suporta tanto o formato envelopado quanto o bruto
-    const { clients = [], sales = [], payments = [] } = restoreData;
-    
-    const dbClient = await pool.connect();
-    
-    try {
-      await dbClient.query('BEGIN');
-      
-      // Limpa dados atuais (Ordem relacional: dependentes primeiro)
-      await dbClient.query('DELETE FROM pagamentos');
-      await dbClient.query('DELETE FROM vendas');
-      await dbClient.query('DELETE FROM clientes');
-
-      // Inserir clientes com mapeamento flexível (camelCase ou snake_case)
-      for (const c of clients) {
-        const id = c.id;
-        const fullName = c.full_name || c.fullName || 'Cliente sem nome';
-        const phone = c.phone || '';
-        const email = c.email || '';
-        const street = c.street || c.address || ''; // Mapeia 'address' para 'street' se necessário
-        const neighborhood = c.neighborhood || '';
-        const city = c.city || '';
-        const state = c.state || '';
-        const cep = c.cep || '';
-        const number = c.number || '';
-        const complement = c.complement || '';
-        const cpf = c.cpf || '';
-        const observation = c.observation || '';
-
-        await dbClient.query(
-          `INSERT INTO clientes (id, full_name, phone, email, street, neighborhood, city, state, cep, number, complement, cpf, observation)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [id, fullName, phone, email, street, neighborhood, city, state, cep, number, complement, cpf, observation]
-        );
-      }
-
-      // Inserir vendas
-      for (const s of sales) {
-        const id = s.id;
-        const clientId = s.client_id || s.clientId;
-        const saleDate = s.sale_date || s.saleDate;
-        const productName = s.product_name || s.productName;
-        const quantity = s.quantity || 1;
-        const unitPrice = s.unit_price || s.unitPrice || 0;
-        const total = s.total || (quantity * unitPrice);
-        const observation = s.observation || '';
-        const productCode = s.product_code || s.productCode || '';
-
-        await dbClient.query(
-          `INSERT INTO vendas (id, client_id, sale_date, product_name, quantity, unit_price, total, observation, product_code)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [id, clientId, saleDate, productName, quantity, unitPrice, total, observation, productCode]
-        );
-      }
-
-      // Inserir pagamentos
-      for (const p of payments) {
-        const id = p.id;
-        const clientId = p.client_id || p.clientId;
-        const paymentDate = p.payment_date || p.paymentDate;
-        const amount = p.amount || 0;
-        const observation = p.observation || '';
-
-        await dbClient.query(
-          `INSERT INTO pagamentos (id, client_id, payment_date, amount, observation)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [id, clientId, paymentDate, amount, observation]
-        );
-      }
-
-      await dbClient.query('COMMIT');
-      res.json({ success: true, message: 'Backup restaurado com sucesso!' });
-    } catch (error: any) {
-      await dbClient.query('ROLLBACK');
-      console.error('API operation failed');
-      res.status(500).json({ success: false, message: 'Erro ao restaurar backup', error: 'Não foi possível concluir a operação.' });
-    } finally {
-      dbClient.release();
-    }
-  } else {
-    res.status(405).json({ message: 'Method not allowed' });
+      if (req.body?.confirmed !== true || !/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(req.body?.restoreId ?? '')) throw new FinancialError('Confirme a restauração e seu identificador.');
+      if (!/^[a-f\d]{64}$/.test(req.body.backupFingerprint ?? '')) throw new FinancialError('Gere e confira um backup dos registros atuais antes de restaurar.');
+      data = validateBackup(req.body);
+      fingerprint = createHash('sha256').update(JSON.stringify(data)).digest('hex');
+    } catch (error: any) { return res.status(400).json({ message: error instanceof FinancialError ? error.message : 'Arquivo de backup inválido.' }); }
   }
+  let db: any;
+  let discard = false;
+  try {
+    db = await pool.connect();
+    if (req.method === 'GET') {
+      await db.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      const data = await readBackupRows(db);
+      const { clients, sales, payments, operations } = data;
+      await db.query('COMMIT');
+      return res.json({ version: '2.0', timestamp: new Date().toISOString(), fingerprint: createHash('sha256').update(JSON.stringify(data)).digest('hex'), counts: { clients: clients.length, sales: sales.length, payments: payments.length, operations: operations.length }, data });
+    }
+    await db.query('BEGIN'); await db.query('SELECT pg_advisory_xact_lock($1)', [FINANCIAL_LOCK]);
+    const existing = (await db.query('SELECT user_id,fingerprint FROM operacoes_financeiras WHERE operation_id=$1', [req.body.restoreId])).rows[0];
+    if (existing) {
+      if (existing.user_id !== String(session.user.id) || existing.fingerprint !== fingerprint) throw new FinancialError('Esta confirmação de restauração já foi utilizada.', 409);
+      await db.query('COMMIT'); return res.json({ success: true, replayed: true, message: 'Restauração já concluída. Nenhum dado foi substituído novamente.' });
+    }
+    const current = await readBackupRows(db);
+    if (createHash('sha256').update(JSON.stringify(current)).digest('hex') !== req.body.backupFingerprint) throw new FinancialError('Os registros mudaram desde o backup. Gere um backup atualizado e confirme novamente.', 409);
+    await insertBackup(db, data);
+    await db.query('INSERT INTO operacoes_financeiras (operation_id,user_id,fingerprint,result) VALUES ($1,$2,$3,$4::jsonb)', [req.body.restoreId, String(session.user.id), fingerprint, JSON.stringify({ kind: 'restore' })]);
+    await db.query('COMMIT'); return res.json({ success: true, message: 'Backup restaurado. Usuários e configurações foram preservados.' });
+  } catch (error: any) {
+    discard = true;
+    if (db) try { await db.query('ROLLBACK'); } catch {}
+    return res.status(error instanceof FinancialError ? error.status : 503).json({ message: error instanceof FinancialError ? error.message : 'Não foi possível concluir. Reenvie a mesma confirmação de restauração.' });
+  } finally { db?.release(discard ? new Error('Transaction failed') : undefined); }
 }

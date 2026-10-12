@@ -1,5 +1,6 @@
 let csrfToken: string | null = null;
 let generation = 0;
+export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 export function setCsrfToken(token: string | null) {
   if (csrfToken !== token) generation++;
   csrfToken = token;
@@ -18,7 +19,7 @@ export async function apiFetch(input: string, init: RequestInit = {}) {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(body?.message || 'Não foi possível concluir a operação.');
+    throw new ApiError(body?.message || body?.error || 'Não foi possível concluir a operação.', response.status);
   }
   const readJson = response.json.bind(response);
   response.json = async () => {

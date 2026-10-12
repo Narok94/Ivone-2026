@@ -5,12 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
+    "prebuild": "node scripts/verify-release.mjs",
     "build": "vite build",
-    "build:demo": "vite build --config vite.demo.config.ts",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
-    "test": "node --import tsx --test tests/auth.test.ts tests/frontend.test.tsx tests/mobile-demo.test.ts tests/demo-isolation.test.ts",
-    "test:demo-artifact": "node tests/verify-demo-artifact.cjs"
+    "test": "node --import tsx --test tests/auth.test.ts tests/frontend.test.tsx tests/conversation.test.ts tests/financial.test.ts tests/login-limit.test.ts tests/backup.test.ts",
+    "test:browser": "node --import tsx tests/official-browser.ts",
+    "verify:release": "node scripts/verify-release.mjs --required"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -22,10 +23,11 @@
     "pg": "^8.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.23.15",
     "ws": "^8.20.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@tailwindcss/vite": "^4.1.14",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -34,10 +36,10 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/ws": "^8.18.1",
-    "@vercel/node": "^5.7.12",
     "@vitejs/plugin-react": "^5.0.4",
     "autoprefixer": "^10.4.21",
     "jsdom": "^29.1.1",
+    "playwright": "^1.64.0",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

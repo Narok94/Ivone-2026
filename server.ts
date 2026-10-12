@@ -13,6 +13,7 @@ import clientsHandler from './api/clients.js';
 import salesHandler from './api/sales.js';
 import paymentsHandler from './api/payments.js';
 import backupHandler from './api/backup.js';
+import operationsHandler from './api/operations.js';
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ async function startServer() {
   app.all('/api/payments', wrap(paymentsHandler));
   app.all('/api/payments/:id', wrap(paymentsHandler));
   app.all('/api/backup', wrap(backupHandler));
+  app.all('/api/operations', wrap(operationsHandler));
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -67,7 +69,7 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+    app.get('/{*path}', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
 
   app.listen(PORT, '0.0.0.0', () => {

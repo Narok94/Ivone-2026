@@ -39,6 +39,7 @@ const Calendar: FC<{ onDateSelect: (date: string) => void; highlightedDates: Set
     const changeMonth = (amount: number) => {
         setCurrentDate(prev => {
             const newDate = new Date(prev);
+            newDate.setDate(1);
             newDate.setMonth(newDate.getMonth() + amount);
             return newDate;
         });
@@ -99,8 +100,8 @@ export const History: FC = () => {
 
     const highlightedDates = useMemo(() => {
       const dates = new Set<string>();
-      sales.forEach(s => dates.add(new Date(s.saleDate + 'T00:00:00').toISOString().split('T')[0]));
-      payments.forEach(p => dates.add(new Date(p.paymentDate + 'T00:00:00').toISOString().split('T')[0]));
+      sales.forEach(s => dates.add(s.saleDate));
+      payments.forEach(p => dates.add(p.paymentDate));
       return dates;
     }, [sales, payments]);
     

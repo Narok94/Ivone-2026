@@ -3,13 +3,14 @@ import { useData } from '../../contexto/DataContext';
 import { Card } from '../common';
 import { BarChartIcon } from '../ui/Icons';
 import { EmptyState } from '../ui/EmptyState';
+import { cents } from '../../lib/finance';
 
 export const Reports: FC = () => {
     const { sales, clients, getClientById } = useData();
 
     const topClients = useMemo(() => {
         const clientTotals = sales.reduce((acc: Record<string, number>, sale) => {
-            acc[sale.clientId] = (acc[sale.clientId] || 0) + sale.total;
+            acc[sale.clientId] = (acc[sale.clientId] || 0) + cents(sale.total);
             return acc;
         }, {} as Record<string, number>);
 
@@ -18,7 +19,7 @@ export const Reports: FC = () => {
             .slice(0, 5)
             .map(([clientId, total]) => ({
                 client: getClientById(clientId),
-                total
+                total: total / 100
             }));
     }, [sales, getClientById]);
     
@@ -28,14 +29,14 @@ export const Reports: FC = () => {
                  acc[sale.productName] = { quantity: 0, total: 0 };
             }
             acc[sale.productName].quantity += sale.quantity;
-            acc[sale.productName].total += sale.total;
+            acc[sale.productName].total += cents(sale.total);
             return acc;
         }, {} as Record<string, { quantity: number; total: number }>);
 
         return (Object.entries(productTotals) as [string, { quantity: number; total: number }][])
             .sort((a, b) => b[1].quantity - a[1].quantity)
             .slice(0, 5)
-            .map(([productName, data]) => ({ productName, ...data }));
+            .map(([productName, data]) => ({ productName, ...data, total: data.total / 100 }));
     }, [sales]);
 
     return (

@@ -5,6 +5,7 @@ import { HistoryIcon } from '../ui/Icons';
 import { EmptyState } from '../ui/EmptyState';
 import { ClientForm } from '../forms/ClientForm';
 import { Sale, Payment } from '../../types';
+import { paymentAllocation } from '../../lib/finance';
 
 type View = 'dashboard' | 'clients' | 'add_client' | 'add_sale' | 'stock' | 'add_payment' | 'reports' | 'history' | 'pending_payments' | 'sales_view' | 'all_payments' | 'client_detail' | 'manage_users' | 'user_summary';
 
@@ -12,7 +13,7 @@ type ClientTransaction = (Sale & { type: 'sale' }) | (Payment & { type: 'payment
 
 const groupClientTransactionsByMonth = (transactions: ClientTransaction[]) => {
     const groups = transactions.reduce((acc, tx) => {
-        const date = new Date(tx.type === 'sale' ? tx.saleDate : tx.paymentDate);
+        const date = new Date((tx.type === 'sale' ? tx.saleDate : tx.paymentDate) + 'T00:00:00');
         const monthYear = date.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
         const capitalizedMonth = monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
 
@@ -32,28 +33,7 @@ export const ClientDetail: FC<{ clientId: string; onNavigate: (view: View, clien
     const client = getClientById(clientId);
     const balance = clientBalances.get(clientId) || 0;
     
-    const salePaymentStatus = useMemo(() => {
-        const statusMap = new Map<string, 'paid' | 'partial' | 'unpaid'>();
-        const clientSales = sales.filter(s => s.clientId === clientId);
-        const clientPayments = payments.filter(p => p.clientId === clientId);
-        // Get sales sorted oldest to newest to apply payments FIFO
-        const sortedSales = [...clientSales].sort((a, b) => new Date(a.saleDate).getTime() - new Date(b.saleDate).getTime());
-        
-        let totalPaid = clientPayments.reduce((sum, p) => sum + p.amount, 0);
-
-        for (const sale of sortedSales) {
-            if (totalPaid >= sale.total) {
-                statusMap.set(sale.id, 'paid');
-                totalPaid -= sale.total;
-            } else if (totalPaid > 0 && totalPaid < sale.total) {
-                statusMap.set(sale.id, 'partial');
-                totalPaid = 0; // The rest of the payment is consumed here
-            } else {
-                statusMap.set(sale.id, 'unpaid');
-            }
-        }
-        return statusMap;
-    }, [sales, payments, clientId]);
+    const salePaymentStatus = useMemo(() => paymentAllocation(sales, payments, clientId), [sales, payments, clientId]);
 
 
     const transactions = useMemo(() => {

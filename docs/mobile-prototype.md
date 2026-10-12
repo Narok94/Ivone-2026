@@ -1,5 +1,7 @@
 # Caderninho — demonstração mobile floral
 
+> Histórico do protótipo aprovado. A versão integrada utiliza autenticação e dados oficiais; a demonstração independente foi retirada do código. Consulte `caderninho-integrado.md`.
+
 ## Escopo e acesso
 
 - Na `dev`, a primeira abertura em telas abaixo de 768 CSS px apresenta a demonstração.

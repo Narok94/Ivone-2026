@@ -3,19 +3,22 @@ import { useData } from '../../contexto/DataContext';
 import { Card, Button, Input, Select } from '../common';
 import { Payment } from '../../types';
 import { motion } from 'motion/react';
+import { cents, today } from '../../lib/finance';
+import { useFinancialCommit } from '../../lib/useFinancialCommit';
 
 export const PaymentForm: FC<{ 
     editingPayment?: Payment | null; 
     onPaymentSuccess: (isEditing: boolean) => void; 
     prefilledClientId: string | null; 
 }> = ({ onPaymentSuccess, prefilledClientId, editingPayment }) => {
-    const { clients, addPayment, updatePayment, clientBalances, isLoading: contextLoading } = useData();
+    const { clients, clientBalances, isRefreshing, dataError } = useData();
+    const financial = useFinancialCommit();
     const isEditing = !!editingPayment;
     const [isLoading, setIsLoading] = useState(false);
 
     const [paymentData, setPaymentData] = useState({
         clientId: prefilledClientId || '',
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: today(),
         amount: '0',
         observation: ''
     });
@@ -29,8 +32,8 @@ export const PaymentForm: FC<{
                 amount: String(editingPayment.amount),
                 observation: editingPayment.observation
             });
-        } else if (prefilledClientId) {
-            setPaymentData(prev => ({ ...prev, clientId: prefilledClientId, amount: '0', observation: '' }));
+        } else {
+            setPaymentData({ clientId: prefilledClientId || '', paymentDate: today(), amount: '0', observation: '' });
         }
     }, [editingPayment, prefilledClientId]);
     
@@ -38,7 +41,7 @@ export const PaymentForm: FC<{
         if (paymentData.clientId) {
             const balance = clientBalances.get(paymentData.clientId);
             const adjustedBalance = isEditing && editingPayment && paymentData.clientId === editingPayment.clientId
-                ? (balance || 0) + editingPayment.amount
+                ? (cents(balance || 0) + cents(editingPayment.amount)) / 100
                 : balance;
             setSelectedClientBalance(adjustedBalance || 0);
         } else {
@@ -53,28 +56,18 @@ export const PaymentForm: FC<{
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (Number(paymentData.amount) <= 0) {
+        if (Number(paymentData.amount) <= 0 && !financial.locked) {
             alert('O valor do pagamento deve ser maior que zero.');
             return;
         }
         
         setIsLoading(true);
         try {
-            const paymentPayload = {
-                ...paymentData,
-                amount: Number(paymentData.amount)
-            };
-            
-            if (isEditing && editingPayment) {
-                await updatePayment({ ...paymentPayload, id: editingPayment.id });
-            } else {
-                await addPayment(paymentPayload);
-            }
-            
-            onPaymentSuccess(isEditing);
-        } catch (error) {
-            console.error(error);
-            alert('Erro ao registrar pagamento. Tente novamente.');
+            const amountCents = financial.locked ? 1 : cents(paymentData.amount);
+            const result = await financial.execute({ kind: isEditing ? 'edit_payment' : 'payment', targetId: editingPayment?.id, clientId: paymentData.clientId, date: paymentData.paymentDate, observation: paymentData.observation, amountCents, allowCredit: amountCents > cents(selectedClientBalance ?? 0) });
+            if (result) { if (result.completedKind === 'payment' || result.completedKind === 'edit_payment') onPaymentSuccess(result.completedKind === 'edit_payment'); else alert('A confirmação anterior foi resolvida. Confira o histórico antes de iniciar este recebimento.'); }
+        } catch (error: any) {
+            alert(error.message || 'Erro ao registrar pagamento. Reenvie a mesma confirmação.');
         } finally {
             setIsLoading(false);
         }
@@ -88,6 +81,8 @@ export const PaymentForm: FC<{
             
             <Card className="p-6 md:p-10 border-rose-100 shadow-xl shadow-rose-200/20">
                 <form onSubmit={handleSubmit} className="space-y-8">
+                    {financial.locked && <p role="alert" className="whitespace-pre-line text-rose-800 text-sm">Há uma confirmação anterior. Reenvie a mesma confirmação para evitar duplicação.{`\n${financial.pendingSummary}`}</p>}
+                    <fieldset disabled={financial.locked || isLoading} className="contents space-y-8">
                     <Select 
                         label="Para qual cliente? 👤"
                         name="clientId" 
@@ -126,6 +121,7 @@ export const PaymentForm: FC<{
                                 <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-xl">R$</span>
                                 <Input
                                     label=""
+                                    aria-label="Valor recebido"
                                     name="amount"
                                     type="number"
                                     min="0.01"
@@ -150,10 +146,11 @@ export const PaymentForm: FC<{
                         className="text-lg py-4 px-6 border-2 border-rose-100 focus:border-rose-300 rounded-[24px]"
                     />
 
+                    </fieldset>
                     <div className="pt-6">
                         <Button 
                             type="submit" 
-                            disabled={!paymentData.clientId || isLoading}
+                            disabled={(!paymentData.clientId && !financial.locked) || isLoading || isRefreshing || !!dataError}
                             className="w-full py-6 text-xl rounded-[32px] shadow-lg shadow-rose-200"
                         >
                             {isLoading ? (

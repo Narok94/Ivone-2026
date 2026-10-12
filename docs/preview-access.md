@@ -1,5 +1,7 @@
 # Investigação do acesso ao Caderninho
 
+> Histórico da demonstração anterior. A integração oficial substitui este fluxo; não utilizar o projeto separado nem os comandos de publicação abaixo. Consulte `caderninho-integrado.md` para o funcionamento atual.
+
 ## Causa confirmada
 
 Em 11/10/2026, o projeto Vercel `ivone-2026` estava corretamente conectado a `Narok94/Ivone-2026`, com produção vinculada à `main`. Tanto o deployment automático do Git quanto o deployment pela CLI da `dev` apontavam para `369cc13a7722696d55afbf296663248eefaa80b0` e estavam `READY`.

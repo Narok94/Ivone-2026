@@ -8,5 +8,12 @@ export const pool = {
     if (this.fail) throw new Error('simulated private database error');
     return { rows: this.rows };
   },
-  async connect() { throw new Error('Database writes/restores are prohibited in these tests'); },
+  async connect() {
+    let readOnly = false;
+    return { query: async (sql, args) => {
+      if (sql.startsWith('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')) readOnly = true;
+      if (!readOnly || !/^(BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY|SELECT|COMMIT|ROLLBACK)/.test(sql)) throw new Error('Database writes/restores are prohibited in these tests');
+      return this.query(sql, args);
+    }, release() {} };
+  },
 };

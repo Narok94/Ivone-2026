@@ -1,249 +1,100 @@
-import { apiFetch, setCsrfToken } from '../lib/api';
-import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useCallback } from 'react';
+import { ApiError, apiFetch, setCsrfToken } from '../lib/api';
+import { pendingKey, readPending } from '../lib/pending-operation';
+import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { Client, Sale, Payment } from '../types';
-
-interface DataContextType {
-  clients: Client[];
+import { cents, clientBalance, FinancialOperation, FinancialResult } from '../lib/finance';
+export type DataSnapshot = { clients: Client[]; sales: Sale[]; payments: Payment[] };
+interface DataContextType extends DataSnapshot {
   addClient: (client: Omit<Client, 'id'>) => Promise<void>;
   updateClient: (client: Client) => Promise<void>;
-  deleteClient: (clientId: string) => Promise<void>;
-  getClientById: (clientId: string) => Client | undefined;
-
-  sales: Sale[];
-  addSale: (sale: Omit<Sale, 'id' | 'total'>) => Promise<Sale>;
-  updateSale: (sale: Sale) => Promise<Sale>;
-  deleteSale: (saleId: string) => Promise<void>;
-
-  payments: Payment[];
-  addPayment: (payment: Omit<Payment, 'id'>) => Promise<void>;
-  updatePayment: (payment: Payment) => Promise<void>;
-  deletePayment: (paymentId: string) => Promise<void>;
-
+  deleteClient: (id: string) => Promise<void>;
+  getClientById: (id: string) => Client | undefined;
+  addSale: (sale: Omit<Sale, 'id' | 'total'>, operationId?: string) => Promise<Sale>;
+  updateSale: (sale: Sale, operationId?: string) => Promise<Sale>;
+  deleteSale: (id: string) => Promise<void>;
+  addPayment: (payment: Omit<Payment, 'id'>, operationId?: string, allowCredit?: boolean) => Promise<void>;
+  updatePayment: (payment: Payment, operationId?: string, allowCredit?: boolean) => Promise<void>;
+  deletePayment: (id: string) => Promise<void>;
+  commitOperation: (operation: FinancialOperation) => Promise<FinancialResult>;
   clientBalances: Map<string, number>;
-  isLoading: boolean;
-  refreshData: () => Promise<void>;
-  
-  user: { id: string, username: string } | null;
+  isLoading: boolean; isRefreshing: boolean; dataError: string | null;
+  refreshData: () => Promise<DataSnapshot>;
+  user: { id: string | number; username: string } | null;
   login: (pin: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => Promise<void>;
 }
-
 const DataContext = createContext<DataContextType | undefined>(undefined);
-
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [user, setUser] = useState<{ id: string, username: string } | null>(null);
+  const [user, setUser] = useState<DataContextType['user']>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Load from API on mount or user change
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const ready = useRef(false);
+  const revision = useRef(0);
   const refreshData = useCallback(async () => {
-    if (!user) {
-        setIsLoading(false);
-        return;
-    }
-    setIsLoading(true);
+    if (!user) return { clients: [], sales: [], payments: [] };
+    if (!ready.current) setIsLoading(true);
+    const requestedRevision = revision.current;
+    setIsRefreshing(true);
     try {
-      const [clientsRes, salesRes, paymentsRes] = await Promise.all([
-        apiFetch('/api/clients').then(r => r.json()),
-        apiFetch('/api/sales').then(r => r.json()),
-        apiFetch('/api/payments').then(r => r.json())
-      ]);
-      setClients(clientsRes);
-      setSales(salesRes);
-      setPayments(paymentsRes);
-    } catch (e) {
-      console.error('Erro ao buscar dados do servidor:', e);
-    } finally {
-      setIsLoading(false);
-    }
+      const { clients, sales, payments } = await (await apiFetch('/api/operations')).json();
+      if (requestedRevision !== revision.current) throw new ApiError('Registros alterados. Consulte novamente.', 409);
+      const snapshot = { clients, sales, payments };
+      setClients(clients); setSales(sales); setPayments(payments); setDataError(null);
+      return snapshot;
+    } catch (error) { if (requestedRevision === revision.current) setDataError('Não consegui atualizar os registros. Tente novamente antes de consultar ou anotar.'); throw error; }
+    finally { ready.current = true; setIsLoading(false); setIsRefreshing(false); }
   }, [user]);
-
   useEffect(() => {
     let active = true;
-    const clearUser = () => {
-      setUser(null);
-      setClients([]);
-      setSales([]);
-      setPayments([]);
-      setIsLoading(false);
-    };
-    window.addEventListener('ivone:unauthorized', clearUser);
+    const clear = () => { ready.current = false; setUser(null); setClients([]); setSales([]); setPayments([]); setDataError(null); setIsLoading(false); };
+    window.addEventListener('ivone:unauthorized', clear);
     localStorage.removeItem('ivone_user');
-    apiFetch('/api/session').then(r => r.json()).then(session => {
-      if (!active) return;
-      setCsrfToken(session.csrfToken);
-      setUser(session.user);
-    }).catch(() => {
-      if (active) clearUser();
-    }).finally(() => {
-      if (active) setIsLoading(false);
-    });
-    return () => {
-      active = false;
-      window.removeEventListener('ivone:unauthorized', clearUser);
-    };
+    apiFetch('/api/session').then(r => r.json()).then(session => { if (active) { setCsrfToken(session.csrfToken); setUser(session.user); } }).catch(() => { if (active) clear(); }).finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; window.removeEventListener('ivone:unauthorized', clear); };
   }, []);
-
-  useEffect(() => {
-    if (user) refreshData();
-    else {
-      setClients([]);
-      setSales([]);
-      setPayments([]);
-    }
-  }, [user, refreshData]);
-
+  useEffect(() => { if (user) void refreshData().catch(() => {}); else { setClients([]); setSales([]); setPayments([]); } }, [user, refreshData]);
   const login = async (pin: string) => {
     try {
-      const res = await apiFetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'Ivone', pin })
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok && data.success) {
-        setCsrfToken(data.csrfToken);
-        setUser(data.user);
-        return { success: true };
-      }
-      
-      // Detailed error handling based on status and response type
-      return { 
-        success: false, 
-        message: data.message || 'Erro ao entrar. Tente novamente mais tarde. 🌸' 
-      };
-      
-    } catch (e: any) {
-      console.error('Login request error:', e);
-      return { 
-        success: false, 
-        message: e.message || 'Erro de conexão. Tente novamente. 🌸'
-      };
-    }
+      const data = await (await apiFetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: 'Ivone', pin }) })).json();
+      if (!data.success) return { success: false, message: data.message || 'Não foi possível entrar.' };
+      ready.current = false; setCsrfToken(data.csrfToken); setUser(data.user); return { success: true };
+    } catch (error: any) { return { success: false, message: error.message || 'Erro de conexão.' }; }
   };
-
-  const logout = async () => {
-    // Service failures must not pretend server-side revocation succeeded.
-    await apiFetch('/api/logout', { method: 'POST' });
-    setCsrfToken(null);
-    setUser(null);
-    setClients([]);
-    setSales([]);
-    setPayments([]);
-  };
-
-  const addClient = useCallback(async (clientData: Omit<Client, 'id'>) => {
-    const res = await apiFetch('/api/clients', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(clientData)
-    });
-    const newClient = await res.json();
-    setClients(prev => [...prev, newClient]);
-  }, []);
-
-  const updateClient = useCallback(async (updatedClient: Client) => {
-    const res = await apiFetch(`/api/clients?id=${updatedClient.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedClient)
-    });
-    const serverClient = await res.json();
-    setClients(prev => prev.map(c => c.id === serverClient.id ? serverClient : c));
-  }, []);
-
-  const deleteClient = useCallback(async (clientId: string) => {
-    await apiFetch(`/api/clients?id=${clientId}`, { method: 'DELETE' });
-    setClients(prev => prev.filter(c => c.id !== clientId));
-  }, []);
-  
-  const getClientById = useCallback((clientId: string) => clients.find(c => c.id === clientId), [clients]);
-
-  const addSale = useCallback(async (saleData: Omit<Sale, 'id'|'total'>) => {
-    const total = parseFloat((saleData.quantity * saleData.unitPrice).toFixed(2));
-    const res = await apiFetch('/api/sales', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...saleData, total })
-    });
-    const newSale = await res.json();
-    setSales(prev => [...prev, newSale]);
-    return newSale;
-  }, []);
-  
-  const updateSale = useCallback(async (updatedSale: Sale) => {
-    const total = parseFloat((updatedSale.quantity * updatedSale.unitPrice).toFixed(2));
-    const res = await apiFetch(`/api/sales?id=${updatedSale.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...updatedSale, total })
-    });
-    const serverSale = await res.json();
-    setSales(prev => prev.map(s => s.id === serverSale.id ? serverSale : s));
-    return serverSale;
-  }, []);
-
-  const deleteSale = useCallback(async (saleId: string) => {
-    await apiFetch(`/api/sales?id=${saleId}`, { method: 'DELETE' });
-    setSales(prev => prev.filter(s => s.id !== saleId));
-  }, []);
-
-  const addPayment = useCallback(async (paymentData: Omit<Payment, 'id'>) => {
-    const res = await apiFetch('/api/payments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(paymentData)
-    });
-    const newPayment = await res.json();
-    setPayments(prev => [...prev, newPayment]);
-  }, []);
-  
-  const updatePayment = useCallback(async (updatedPayment: Payment) => {
-    const res = await apiFetch(`/api/payments?id=${updatedPayment.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updatedPayment)
-    });
-    const serverPayment = await res.json();
-    setPayments(prev => prev.map(p => p.id === serverPayment.id ? serverPayment : p));
-  }, []);
-
-  const deletePayment = useCallback(async (paymentId: string) => {
-    await apiFetch(`/api/payments?id=${paymentId}`, { method: 'DELETE' });
-    setPayments(prev => prev.filter(p => p.id !== paymentId));
-  }, []);
-
-  const clientBalances = useMemo(() => {
-    const balances = new Map<string, number>();
-    clients.forEach(client => {
-        const totalSales = sales.filter(s => s.clientId === client.id).reduce((sum, s) => sum + s.total, 0);
-        const totalPayments = payments.filter(p => p.clientId === client.id).reduce((sum, p) => sum + p.amount, 0);
-        balances.set(client.id, totalSales - totalPayments);
-    });
-    return balances;
-  }, [clients, sales, payments]);
-
-  const value = {
-    clients, addClient, updateClient, deleteClient, getClientById,
-    sales, addSale, updateSale, deleteSale,
-    payments, addPayment, updatePayment, deletePayment,
-    clientBalances,
-    isLoading,
-    refreshData,
-    user, login, logout
-  };
-
-  return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+  const logout = async () => { await apiFetch('/api/logout', { method: 'POST' }); setCsrfToken(null); ready.current = false; setUser(null); setClients([]); setSales([]); setPayments([]); setDataError(null); };
+  const addClient = useCallback(async (client: Omit<Client, 'id'>) => { revision.current++; const saved = await (await apiFetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(client) })).json(); revision.current++; setClients(old => [...old, saved]); }, []);
+  const updateClient = useCallback(async (client: Client) => { revision.current++; const saved = await (await apiFetch(`/api/clients?id=${client.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(client) })).json(); revision.current++; setClients(old => old.map(c => c.id === saved.id ? saved : c)); }, []);
+  const deleteClient = useCallback(async (id: string) => { revision.current++; await apiFetch(`/api/clients?id=${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmed: true }) }); revision.current++; setClients(old => old.filter(c => c.id !== id)); setSales(old => old.filter(s => s.clientId !== id)); setPayments(old => old.filter(p => p.clientId !== id)); }, []);
+  const getClientById = useCallback((id: string) => clients.find(c => c.id === id), [clients]);
+  const commitOperation = useCallback(async (operation: FinancialOperation): Promise<FinancialResult> => {
+    if (!user) throw new Error('Entre novamente antes de confirmar.');
+    const key = pendingKey(String(user.id));
+    const existing = readPending(String(user.id));
+    if (existing && existing.operationId !== operation.operationId) throw new Error('Conclua a confirmação anterior antes de iniciar outra operação.');
+    sessionStorage.setItem(key, JSON.stringify(operation));
+    revision.current++;
+    try {
+      const result = await (await apiFetch('/api/operations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(operation) })).json();
+      revision.current++;
+      setSales(result.sales); setPayments(result.payments); setDataError(null); sessionStorage.removeItem(key); return result;
+    } catch (error) { if (error instanceof ApiError && [400, 404, 422].includes(error.status)) sessionStorage.removeItem(key); throw error; }
+  }, [user]);
+  const addSale = useCallback(async (sale: Omit<Sale, 'id' | 'total'>, operationId = crypto.randomUUID()) => {
+    const result = await commitOperation({ operationId, confirmed: true, kind: 'sale', clientId: sale.clientId, date: sale.saleDate, observation: sale.observation, receivedCents: 0, items: [{ productName: sale.productName, productCode: sale.productCode, quantity: sale.quantity, unitCents: cents(sale.unitPrice) }] });
+    return result.sales.find(s => s.id === result.saleIds?.[0])!;
+  }, [commitOperation]);
+  const updateSale = useCallback(async (sale: Sale, operationId = crypto.randomUUID()) => {
+    const result = await commitOperation({ operationId, confirmed: true, kind: 'edit_sale', targetId: sale.id, clientId: sale.clientId, date: sale.saleDate, observation: sale.observation, receivedCents: 0, items: [{ productName: sale.productName, productCode: sale.productCode, quantity: sale.quantity, unitCents: cents(sale.unitPrice) }] });
+    return result.sales.find(s => s.id === sale.id)!;
+  }, [commitOperation]);
+  const addPayment = useCallback(async (payment: Omit<Payment, 'id'>, operationId = crypto.randomUUID(), allowCredit = false) => { await commitOperation({ operationId, confirmed: true, kind: 'payment', clientId: payment.clientId, date: payment.paymentDate, observation: payment.observation, amountCents: cents(payment.amount), allowCredit }); }, [commitOperation]);
+  const updatePayment = useCallback(async (payment: Payment, operationId = crypto.randomUUID(), allowCredit = false) => { await commitOperation({ operationId, confirmed: true, kind: 'edit_payment', targetId: payment.id, clientId: payment.clientId, date: payment.paymentDate, observation: payment.observation, amountCents: cents(payment.amount), allowCredit }); }, [commitOperation]);
+  const deleteSale = useCallback(async (id: string) => { const sale = sales.find(s => s.id === id); if (!sale) { await apiFetch(`/api/sales?id=${id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmed: true, operationId: crypto.randomUUID() }) }); return; } await commitOperation({ operationId: crypto.randomUUID(), confirmed: true, kind: 'delete_sale', targetId: id, clientId: sale.clientId, date: sale.saleDate, observation: '' }); }, [sales, commitOperation]);
+  const deletePayment = useCallback(async (id: string) => { const payment = payments.find(p => p.id === id); if (!payment) throw new Error('Pagamento não encontrado. Atualize os registros.'); await commitOperation({ operationId: crypto.randomUUID(), confirmed: true, kind: 'delete_payment', targetId: id, clientId: payment.clientId, date: payment.paymentDate, observation: '' }); }, [payments, commitOperation]);
+  const clientBalances = useMemo(() => new Map(clients.map(c => [c.id, clientBalance(sales, payments, c.id) / 100])), [clients, sales, payments]);
+  return <DataContext.Provider value={{ clients, sales, payments, addClient, updateClient, deleteClient, getClientById, addSale, updateSale, deleteSale, addPayment, updatePayment, deletePayment, commitOperation, clientBalances, isLoading, isRefreshing, dataError, refreshData, user, login, logout }}>{children}</DataContext.Provider>;
 };
-
-export const useData = () => {
-  const context = useContext(DataContext);
-  if (context === undefined) {
-    throw new Error('useData must be used within a DataProvider');
-  }
-  return context;
-};
+export const useData = () => { const value = useContext(DataContext); if (!value) throw new Error('useData must be used within a DataProvider'); return value; };

@@ -4,6 +4,7 @@ import { Card, Button } from '../common';
 import { ArrowLeftIcon, WalletIcon, EditIcon, TrashIcon } from '../ui/Icons';
 import { Client, Payment } from '../../types';
 import { EmptyState } from '../ui/EmptyState';
+import { cents } from '../../lib/finance';
 
 export const AllPayments: FC<{ onEditPayment: (payment: Payment) => void; showToast: (msg: string) => void; }> = ({ onEditPayment, showToast }) => {
     const { payments, clients, deletePayment } = useData();
@@ -13,9 +14,9 @@ export const AllPayments: FC<{ onEditPayment: (payment: Payment) => void; showTo
         const totals = new Map<string, number>();
         payments.forEach(payment => {
             const currentTotal = totals.get(payment.clientId) || 0;
-            totals.set(payment.clientId, currentTotal + payment.amount);
+            totals.set(payment.clientId, currentTotal + cents(payment.amount));
         });
-        return totals;
+        return new Map([...totals].map(([id, value]) => [id, value / 100]));
     }, [payments]);
     
     const clientsWithPayments = useMemo(() => {

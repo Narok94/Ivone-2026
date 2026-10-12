@@ -2,6 +2,8 @@
 
 Changes are confined to `dev`. There is no deployment, database migration or database provisioning at startup.
 
+The integrated Caderninho adds `/api/operations`, PIN attempt limiting and release verification. See `caderninho-integrado.md` for the current delivery and activation requirements. The financial migration is prepared and tested in isolation; it has not been applied to Neon.
+
 ## Changed files
 
 - Backend: `api/login.ts`, `api/session.ts` (new), `api/logout.ts` (new), `api/clients.ts`, `api/sales.ts`, `api/payments.ts`, `api/backup.ts`, `api/db.ts`, `server.ts`, `server/lib/session.ts` (new).
@@ -23,7 +25,7 @@ The lockfile was repaired after `npm ci` rejected pre-existing inconsistencies. 
 
 ## External configuration pending
 
-Production and Vercel require shared session storage. Configure an HTTPS Redis REST service compatible with the [Upstash REST API](https://upstash.com/docs/redis/features/restapi), with support for `SET ... EX ... NX`, `GET` and `DEL`:
+Production and Vercel require shared session storage. Configure an HTTPS Redis REST service compatible with the [Upstash REST API](https://upstash.com/docs/redis/features/restapi), with support for `SET ... EX ... NX`, `GET`, `DEL` and atomic Lua `EVAL` (login attempt counters with expiration):
 
 - `AUTH_REDIS_REST_URL`: HTTPS service endpoint, server environment only.
 - `AUTH_REDIS_REST_TOKEN`: service access token, server environment only; never commit its value.
@@ -39,7 +41,7 @@ The existing Neon connection is still necessary for real PIN login and business 
 
 - `npm run lint`: TypeScript checks.
 - `npm run build`: production frontend build.
-- `npm test`: backend handlers, local Express HTTP integration, production session store adapter and frontend React effects in a simulated DOM. Redis is simulated, and database restores/writes are prohibited by the test substitute.
+- `npm test`: backend handlers, local Express HTTP integration, production session store adapter and frontend React effects in a simulated DOM. Redis is simulated. Financial writes/restores run only on isolated in-memory PostgreSQL fixtures, never Neon.
 - Coverage includes missing/tampered cookies, all business APIs, login, page reload, absolute expiration, CSRF failures, shared sessions, server-side logout, storage outage, forged localStorage and `401` cleanup.
 
 Before deployment, verify the actual Redis service, HTTPS origin/cookie behavior and complete browser workflows in a staging environment with a separate test database. Production Neon was not inspected or tested. No restoration was executed even against a test database.

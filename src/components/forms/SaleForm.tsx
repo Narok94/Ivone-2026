@@ -3,6 +3,8 @@ import { useData } from '../../contexto/DataContext';
 import { Card, Button, Input, TextArea } from '../common';
 import { Sale } from '../../types';
 import { Trash2Icon, PlusIcon } from 'lucide-react';
+import { cents, lineTotal, sumCents, today } from '../../lib/finance';
+import { useFinancialCommit } from '../../lib/useFinancialCommit';
 
 interface SaleItem {
     id: string;
@@ -13,7 +15,8 @@ interface SaleItem {
 }
 
 export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sale, isEditing: boolean) => void; prefilledClientId: string | null; }> = ({ editingSale, onSaleSuccess, prefilledClientId }) => {
-    const { clients, addSale, updateSale } = useData();
+    const { clients, isRefreshing, dataError } = useData();
+    const financial = useFinancialCommit();
     const isEditing = !!editingSale;
     const clientSelectRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +29,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
     });
 
     const [clientId, setClientId] = useState(prefilledClientId || '');
-    const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+    const [saleDate, setSaleDate] = useState(today());
     const [observation, setObservation] = useState('');
     const [items, setItems] = useState<SaleItem[]>([initialItem()]);
     
@@ -56,7 +59,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
             }]);
         } else {
              setClientId(prefilledClientId || '');
-             setSaleDate(new Date().toISOString().split('T')[0]);
+             setSaleDate(today());
              setObservation('');
              setItems([initialItem()]);
         }
@@ -98,55 +101,16 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
         e.preventDefault();
         setClientError('');
 
-        if (!clientId) {
+        if (!clientId && !financial.locked) {
             setClientError('É obrigatório selecionar um cliente para registrar a encomenda.');
             return;
         }
 
         setIsSubmitting(true);
         try {
-            if (isEditing && editingSale) {
-                const item = items[0];
-                const quantity = parseFloat(item.quantity) || 0;
-                const unitPrice = parseFloat(item.unitPrice) || 0;
-                
-                const updatedSale = await updateSale({ 
-                    id: editingSale.id,
-                    clientId,
-                    saleDate,
-                    observation,
-                    productCode: item.productCode,
-                    productName: item.productName,
-                    quantity,
-                    unitPrice,
-                    total: 0 // recalculated in context
-                });
-                onSaleSuccess(updatedSale, true);
-            } else {
-                let firstSaleId = '';
-                let lastSale: any = null;
-
-                for (const item of items) {
-                    const quantity = parseFloat(item.quantity) || 0;
-                    const unitPrice = parseFloat(item.unitPrice) || 0;
-                    
-                    if (quantity <= 0) continue;
-
-                    lastSale = await addSale({
-                        clientId,
-                        saleDate,
-                        observation,
-                        productCode: item.productCode,
-                        productName: item.productName,
-                        quantity,
-                        unitPrice,
-                    });
-                }
-                
-                if (lastSale) {
-                    onSaleSuccess(lastSale, false);
-                }
-            }
+            const candidateItems = financial.locked ? [] : items.map(item => ({ productName: item.productName, productCode: item.productCode, quantity: Number(item.quantity), unitCents: cents(item.unitPrice) }));
+            const result = await financial.execute({ kind: isEditing ? 'edit_sale' : 'sale', targetId: editingSale?.id, clientId, date: saleDate, observation, receivedCents: 0, items: candidateItems });
+            if (result) { if (!['sale', 'edit_sale'].includes(result.completedKind)) alert('A confirmação anterior foi resolvida. Confira o histórico antes de iniciar esta venda.'); else { const sale = result.sales.find(s => s.id === (editingSale?.id ?? result.saleIds?.[0])); if (sale) onSaleSuccess(sale, result.completedKind === 'edit_sale'); else alert('Confirmação concluída. Atualize a gestão para ver os registros atuais.'); } }
         } catch (error: any) {
             alert(`Erro ao salvar encomenda: ${error.message}`);
         } finally {
@@ -155,11 +119,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
     };
 
     const total = useMemo(() => {
-        return items.reduce((acc, item) => {
-            const q = parseFloat(item.quantity) || 0;
-            const p = parseFloat(item.unitPrice) || 0;
-            return acc + (q * p);
-        }, 0);
+        try { return sumCents(items.map(item => lineTotal(Number(item.quantity), cents(item.unitPrice)))) / 100; } catch { return 0; }
     }, [items]);
 
     return (
@@ -170,9 +130,11 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
 
             <Card className="p-4 md:p-10 border-rose-100 shadow-xl shadow-rose-200/20">
                 <form onSubmit={handleSubmit} className="space-y-6 md:space-y-8">
+                    {financial.locked && <p role="alert" className="whitespace-pre-line text-rose-800 text-sm">Há uma confirmação sem resposta final. Reenvie a mesma confirmação abaixo. Não será duplicada.{`\n${financial.pendingSummary}`}</p>}
+                    <fieldset disabled={financial.locked || isSubmitting} className="contents space-y-6 md:space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                         <div ref={clientSelectRef} className="space-y-2">
-                            <label className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Quem comprou? * 👤</label>
+                            <label htmlFor="client-select-button" className="block text-sm font-black text-rose-400 uppercase tracking-widest ml-1">Quem comprou? * 👤</label>
                             <div className="relative">
                                 <button
                                     type="button"
@@ -275,6 +237,7 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                             <span className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 font-black text-rose-300 text-sm md:text-xl transition-colors group-focus-within:text-rose-500">R$</span>
                                             <Input
                                                 label=""
+                                                aria-label={`Preço por unidade ${index + 1}`}
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
@@ -324,10 +287,12 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                             <p className="text-xl md:text-4xl font-black">{total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                         </div>
 
+                    </div>
+                    </fieldset>
                         <div className="pt-2">
                             <Button 
                                 type="submit" 
-                                disabled={!clientId || isSubmitting}
+                                disabled={(!clientId && !financial.locked) || isSubmitting || isRefreshing || !!dataError}
                                 className="w-full py-4 md:py-6 text-lg md:text-xl rounded-[24px] md:rounded-[32px] shadow-lg shadow-rose-200"
                             >
                                 {isSubmitting ? (
@@ -340,7 +305,6 @@ export const SaleForm: FC<{ editingSale?: Sale | null; onSaleSuccess: (sale: Sal
                                 )}
                             </Button>
                         </div>
-                    </div>
                 </form>
             </Card>
         </div>
