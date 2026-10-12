@@ -1,0 +1,31 @@
+@font-face{font-family:'Login Dancing Script';src:url('../../assets/DancingScript.ttf') format('truetype');font-weight:400 700;font-style:normal;font-display:swap}
+.login-floral{position:fixed;inset:0;height:100dvh;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;color:#674b4f;font-family:Inter,sans-serif;isolation:isolate;scroll-padding:20px}
+.login-floral::before{content:'';position:fixed;inset:0;z-index:-1;background:#f9d6d2 url('../../assets/fundologin.png') center/cover no-repeat;pointer-events:none}
+.login-floral *{box-sizing:border-box}
+.login-floral-content{width:100%;min-height:100%;padding:calc(32.8svh + env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));text-align:center}
+.login-greeting h1{font-family:'Login Dancing Script',cursive;font-size:clamp(44px,10.8vw,64px);font-weight:600;line-height:1.15;margin:0;color:#b52259;white-space:nowrap}
+.login-greeting h1 span{display:inline-block;font-family:Inter,sans-serif;font-size:.75em;vertical-align:middle}
+.login-greeting p{font-size:clamp(18px,4.4vw,26px);line-height:1.25;font-weight:400;color:#956e7b;margin:9px 0 0}
+.login-form{width:clamp(224px,60vw,354px);max-width:100%;margin:0 auto;background:transparent;border:0;box-shadow:none}
+.login-heart-divider{display:flex;align-items:center;justify-content:center;gap:6px;margin:14px 0 15px;color:#dc7d98}
+.login-heart-divider span{height:1px;flex:1;background:linear-gradient(90deg,transparent,#dc9eac)}
+.login-heart-divider span:last-child{transform:rotate(180deg)}
+.login-heart-divider svg{width:16px;height:16px;stroke-width:1}
+.login-pin-instruction{font-size:clamp(14px,3.4vw,20px);line-height:1.3;margin:0 0 15px;color:#644e50}
+.login-pin-fields{display:flex;gap:clamp(8px,2vw,13px);width:100%}
+.login-pin-cell{flex:1;min-width:0;position:relative;border-radius:clamp(10px,2.4vw,15px);background:#fffaf9ef;box-shadow:0 3px 7px #b74e681a}
+.login-pin-cell input{display:block;width:100%;height:clamp(48px,12.3vw,74px);border:1px solid #e7b2c1;border-radius:inherit;background:transparent;color:#b52259;font-size:24px;text-align:center;outline-offset:3px;padding:0;caret-color:#b52259}
+.login-pin-cell input::placeholder{color:transparent}
+.login-pin-lock{position:absolute;inset:0;display:grid;place-items:center;color:#b92b60;pointer-events:none}
+.login-pin-lock svg{height:clamp(23px,5.5vw,32px);width:clamp(23px,5.5vw,32px)}
+.login-access{width:100%;min-height:clamp(50px,12vw,72px);margin-top:12px;border:0;border-radius:100px;background:linear-gradient(110deg,#d54576,#d33769);box-shadow:0 7px 16px #c3436329;color:#fff9fa;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:10px clamp(12px,2.5vw,18px) 10px clamp(16px,4vw,32px);font-family:inherit;font-size:clamp(14px,3.8vw,22px);font-weight:400;line-height:1.2;cursor:pointer;transition:filter .15s}
+.login-access:disabled{cursor:default}.login-access:not(:disabled):hover{filter:brightness(1.04)}
+.login-sparkle{font-size:.8em;white-space:nowrap}
+.login-access-arrow{display:grid;place-items:center;width:clamp(29px,7vw,42px);height:clamp(29px,7vw,42px);flex:none;border-radius:50%;background:#fff9f9;color:#b9295b}
+.login-access-arrow svg{width:70%;height:70%;stroke-width:2}
+.login-floral input:focus-visible,.login-access:focus-visible{outline:2px solid #a92556;outline-offset:3px}
+.login-error{font-size:13px;color:#98234b;font-weight:600;line-height:1.4;margin:12px 0 0;overflow-wrap:anywhere}
+.login-floral[data-keyboard=true] .login-floral-content{padding-top:calc(20px + env(safe-area-inset-top))}
+@media(max-height:480px){.login-floral-content{padding-top:calc(20px + env(safe-area-inset-top))}}
+@media(min-width:768px){.login-floral::before{background-position:center 65%}.login-floral-content{padding-top:calc(26svh + env(safe-area-inset-top))}}
+@media(prefers-reduced-motion:reduce){.login-access{transition:none}}

@@ -13,6 +13,7 @@
     "test": "node --import tsx --test tests/auth.test.ts tests/neon-auth.test.ts tests/frontend.test.tsx tests/conversation.test.ts tests/financial.test.ts tests/login-limit.test.ts tests/backup.test.ts tests/mobile-conversation.test.ts tests/client-history.test.ts tests/client-search.test.ts",
     "test:auth": "node --import tsx --test tests/auth.test.ts tests/neon-auth.test.ts tests/login-limit.test.ts tests/server-boundary.test.ts",
     "test:browser": "node --import tsx tests/official-browser.ts",
+    "test:login": "node --import tsx tests/login-browser.ts",
     "test:local": "node --import tsx tests/local-caderninho.ts",
     "test:isolation": "node --import tsx --test tests/server-boundary.test.ts tests/demo-gateway.test.ts",
     "verify:release": "node scripts/verify-release.mjs --required"
