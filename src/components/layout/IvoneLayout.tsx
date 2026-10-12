@@ -109,7 +109,6 @@ export const IvoneLayout: FC<IvoneLayoutProps> = ({ children, activeView, setAct
                 {/* Notebook Background effect for the whole center */}
                 <div className="absolute inset-0 bg-[#fdfdfd] shadow-2xl rounded-[2.5rem] paper-texture -z-10 border border-gray-300" />
                 
-                {new URLSearchParams(window.location.search).get('modo') === 'gestao' && <a href="/" className="md:hidden block text-center py-3 text-sm text-rose-700">Voltar ao Caderninho 🌷</a>}
                 {/* Header with Logo at Top Left */}
                 <header className="py-6 md:py-8 relative min-h-[100px] md:min-h-[140px] flex items-center justify-center z-50">
                     <div className="absolute left-0 top-2 md:top-4">

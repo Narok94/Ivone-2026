@@ -35,8 +35,9 @@ const App: FC = () => {
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [editingSale, setEditingSale] = useState<Sale | null>(null);
     const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
-    const [mobile, setMobile] = useState(() => window.matchMedia('(max-width: 767px), (hover: none) and (pointer: coarse)').matches);
-    useEffect(() => { const query = window.matchMedia('(max-width: 767px), (hover: none) and (pointer: coarse)'); const change = () => setMobile(query.matches); query.addEventListener('change', change); return () => query.removeEventListener('change', change); }, []);
+    const phone = /iPhone|iPod|Android.*Mobile/i.test(navigator.userAgent);
+    const [mobile, setMobile] = useState(() => phone || window.matchMedia('(max-width: 767px)').matches);
+    useEffect(() => { const query = window.matchMedia('(max-width: 767px)'); const change = () => setMobile(phone || query.matches); query.addEventListener('change', change); return () => query.removeEventListener('change', change); }, []);
 
     const showToast = (message: string) => {
         setToast(message);
@@ -93,7 +94,7 @@ const App: FC = () => {
     if (!user) {
         return <Login />;
     }
-    if (mobile && new URLSearchParams(window.location.search).get('modo') !== 'gestao') return <MobileCaderninho />;
+    if (mobile) return <MobileCaderninho />;
 
     // Standard User View Logic
     return (

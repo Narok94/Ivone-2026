@@ -1,149 +1,135 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUp, ClipboardList, Plus, ReceiptText, Wallet } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ArrowUp } from 'lucide-react';
 import { ChatFrame } from './ChatFrame';
-import { OperationEditor } from './OperationEditor';
-import { DataSnapshot, useData } from '../../contexto/DataContext';
-import { Interpretation, interpret } from '../../lib/conversation';
-import { brCents, cents, clientBalance, currency, dateLabel, FinancialOperation, lineTotal, sumCents, today, validDate } from '../../lib/finance';
-import { ApiError } from '../../lib/api';
+import { useData } from '../../contexto/DataContext';
+import { apiFetch, ApiError } from '../../lib/api';
 import { readPending } from '../../lib/pending-operation';
+import { clientBalance, currency, type FinancialOperation } from '../../lib/finance';
+import { clientFields, transition, type Action, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
 
-type Phase = 'client' | 'editor' | 'payment' | 'partial' | 'confirm' | 'retry' | 'period';
-type Draft = { value: Interpretation; phase: Phase; receivedCents?: number; operation?: FinancialOperation };
-type Message = { id: number; text: string; own?: boolean };
-const shortcuts = [{ label: 'Nova Venda', icon: Plus, action: 'sale' }, { label: 'Recebimento', icon: Wallet, action: 'payment' }, { label: 'Extrato', icon: ReceiptText, action: 'statement' }, { label: 'Pendências', icon: ClipboardList, action: 'pending' }] as const;
-
+type Message = { id: number; text: string; own?: boolean; summary?: string };
 export default function MobileCaderninho() {
-  const { clients, sales, payments, refreshData, commitOperation, logout, user, dataError, isRefreshing } = useData();
-  const pendingKey = `ivone_pending_operation:${user!.id}`;
-  const [pendingError] = useState(() => { try { readPending(String(user!.id)); return ''; } catch (error: any) { return error.message; } });
-  const [draft, setDraft] = useState<Draft | null>(() => {
+  const data = useData(); const { user, refreshData, commitOperation, logout, isRefreshing, dataError } = data;
+  const clientKey = `ivone_pending_client:${user!.id}`; const restoreKey = `ivone_pending_restore:${user!.id}`;
+  const initial = (): Reply => {
     try {
-      const operation = readPending(String(user!.id));
-      if (!operation || !validDate(operation.date)) return null;
-      if (operation.items) operation.items.forEach(item => lineTotal(item.quantity, item.unitCents));
-      return { phase: 'retry', operation, receivedCents: operation.receivedCents, value: { kind: operation.kind.endsWith('sale') ? 'sale' : 'payment', clientId: operation.clientId, candidates: [], date: operation.date, observation: operation.observation, items: operation.items ?? [], amountCents: operation.amountCents, installments: false } };
-    } catch { return null; }
-  });
-  const [messages, setMessages] = useState<Message[]>([{ id: 0, text: draft ? 'Há uma confirmação anterior sem resposta final. Tente novamente para verificar o resultado com segurança; não vou duplicar o lançamento.' : 'Oi! Eu sou seu Caderninho 🌷\nConte o que vendeu ou recebeu. Antes de anotar, vou conferir tudo com você.' }]);
-  const [input, setInput] = useState('');
-  const [working, setWorking] = useState(false);
-  const [creditAccepted, setCreditAccepted] = useState(false);
-  const sequence = useRef(1);
-  const busy = useRef(false);
-  const field = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (draft?.phase === 'partial') { setInput(''); const frame = requestAnimationFrame(() => field.current?.focus()); return () => cancelAnimationFrame(frame); } }, [draft?.phase]);
-  const add = (text: string, own = false) => setMessages(old => [...old, { id: sequence.current++, text, own }]);
-  const client = clients.find(c => c.id === draft?.value.clientId);
-  const orderTotal = draft?.value.kind === 'sale' ? sumCents(draft.value.items.map(item => item.unitCents === null ? 0 : lineTotal(item.quantity, item.unitCents))) : 0;
-  const currentBalance = client ? clientBalance(sales, payments, client.id) : 0;
-  const received = draft?.value.kind === 'sale' ? draft.receivedCents ?? 0 : draft?.value.amountCents ?? 0;
-  const predictedBalance = currentBalance + orderTotal - received;
-  const needsCredit = draft?.value.kind === 'payment' && predictedBalance < 0;
-  const pendingTitle = draft?.operation ? ({ sale: 'Confirmação de venda', payment: 'Confirmação de recebimento', edit_sale: 'Edição de venda', edit_payment: 'Edição de recebimento', delete_sale: 'Exclusão de venda', delete_payment: 'Exclusão de recebimento' }[draft.operation.kind]) : undefined;
-
-  async function query(value: Interpretation, snapshot?: DataSnapshot) {
-    const data = snapshot ?? await refreshData();
-    if (value.kind === 'pending') {
-      const pending = data.clients.map(c => ({ name: c.fullName, balance: clientBalance(data.sales, data.payments, c.id) })).filter(c => c.balance > 0).sort((a, b) => b.balance - a.balance);
-      add(pending.length ? `Quem está devendo\n${pending.map(c => `${c.name}: ${currency(c.balance)}`).join('\n')}\nTotal pendente: ${currency(sumCents(pending.map(c => c.balance)))}` : 'Nenhuma cliente tem saldo pendente nos registros atuais.');
-    } else if (value.kind === 'received') {
-      const day = today();
-      const person = value.filterClient ? data.clients.find(c => c.id === value.clientId) : null;
-      if (value.filterClient && !person) throw new Error('Cliente não encontrada.');
-      const list = data.payments.filter(p => !person || p.clientId === person.id).filter(p => value.period === 'today' ? p.paymentDate === day : value.period === 'month' ? p.paymentDate.startsWith(day.slice(0, 7)) : true);
-      add(`Recebido${person ? ` de ${person.fullName}` : ''} ${value.period === 'today' ? 'hoje' : value.period === 'month' ? 'neste mês' : 'em todo o histórico'}: ${currency(sumCents(list.map(p => cents(p.amount))))}.`);
-    } else {
-      const person = data.clients.find(c => c.id === value.clientId);
-      if (!person) { add('Cliente não encontrada. Escolha uma cliente cadastrada na gestão.'); return; }
-      const balance = clientBalance(data.sales, data.payments, person.id);
-      const label = balance >= 0 ? `Saldo pendente: ${currency(balance)}` : `Crédito: ${currency(-balance)}`;
-      if (value.kind === 'balance') add(`${person.fullName}\n${label}`);
-      else {
-        const entries = [...data.sales.filter(s => s.clientId === person.id).map(s => ({ date: s.saleDate, text: `${dateLabel(s.saleDate)} · ${s.quantity} ${s.productName}: ${currency(cents(s.total))}` })), ...data.payments.filter(p => p.clientId === person.id).map(p => ({ date: p.paymentDate, text: `${dateLabel(p.paymentDate)} · Recebimento: ${currency(cents(p.amount))}` }))].sort((a, b) => a.date.localeCompare(b.date));
-        add(`Extrato de ${person.fullName}\n${entries.length ? entries.map(e => e.text).join('\n') : 'Ainda não há lançamentos.'}\n${label}\nOs recebimentos são agregados por cliente.`);
+      const financial = readPending(String(user!.id));
+      if (financial) return { state: { type: 'pendingFinancial', operation: financial }, text: 'Uma confirmação financeira aguarda resposta. Vou verificar sem duplicar.', choices: ['Verificar resultado'] };
+      const raw = sessionStorage.getItem(clientKey);
+      if (raw) {
+        const request: ClientRequest = JSON.parse(raw);
+        if (!['create', 'edit', 'delete'].includes(request.mode) || !request.data?.fullName || !Array.isArray(request.beforeIds)) throw new Error('Confirmação de cadastro pendente inválida. Consulte o histórico antes de outra operação.');
+        return { state: { type: 'pendingClient', request }, text: 'Uma alteração de cliente aguarda resposta. Vou consultar sem repetir a gravação.', choices: ['Verificar resultado'] };
+      }
+      if (sessionStorage.getItem(restoreKey)) return { state: { type: 'attachment', attempted: true }, text: 'Uma restauração enviada aguarda resposta. Anexe o mesmo arquivo para verificar sem repetir a substituição.', choices: ['Anexar backup'] };
+      return { state: { type: 'idle' }, text: 'Oi! Eu sou seu Caderninho 🌷\nPode me contar uma venda, um recebimento ou pedir clientes, dívidas, extratos, histórico, relatórios e configurações. Antes de anotar ou alterar, vou conferir tudo com você.', choices: [] };
+    } catch (e: any) { return { state: { type: 'blocked', reason: e.message }, text: e.message, choices: [] }; }
+  };
+  const [reply, setReply] = useState<Reply>(initial); const current = useRef(reply);
+  const [messages, setMessages] = useState<Message[]>([{ id: 0, text: reply.text }]);
+  const [input, setInput] = useState(''); const [working, setWorking] = useState(false);
+  const busy = useRef(false); const sequence = useRef(1); const attachment = useRef<HTMLInputElement>(null);
+  const snapshot = (): Snapshot => ({ clients: data.clients, sales: data.sales, payments: data.payments });
+  const append = (text: string, own = false, summary?: string) => setMessages(old => [...old, { id: sequence.current++, text, own, summary }]);
+  function apply(next: Reply) { current.current = next; setReply(next); if (next.text) append(next.text, false, next.summary); }
+  const response = (state: State, text: string, choices: string[] = []): Reply => ({ state, text, choices });
+  const balanceLabel = (fresh: Snapshot, id: string) => { const balance = clientBalance(fresh.sales, fresh.payments, id); return `${balance >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(balance))}`; };
+  async function backup() {
+    const result = await (await apiFetch('/api/backup')).json();
+    if (!result.fingerprint || !['clients', 'sales', 'payments'].every(key => Array.isArray(result.data?.[key]) && result.data[key].length === result.counts?.[key])) throw new Error('Não consegui verificar um backup completo. Nenhum dado será substituído.');
+    const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = 'backup_ivone.json'; link.click(); URL.revokeObjectURL(url); return result.fingerprint as string;
+  }
+  async function checkClient(request: ClientRequest): Promise<Reply> {
+    const fresh = await refreshData();
+    const equal = (person: typeof fresh.clients[number]) => clientFields.every(([field]) => (person[field] ?? '') === (request.data[field] ?? '').trim());
+    const found = request.mode === 'create' ? fresh.clients.filter(c => !request.beforeIds.includes(c.id) && equal(c)) : fresh.clients.filter(c => c.id === request.id && equal(c));
+    const deleted = request.mode === 'delete' && !fresh.clients.some(c => c.id === request.id);
+    if (found.length === 1 || deleted) {
+      sessionStorage.removeItem(clientKey);
+      return response({ type: 'idle' }, `Verifiquei o resultado sem repetir a gravação. ${deleted ? 'Cliente excluída, sem lançamentos.' : `Cadastro de ${found[0].fullName} salvo.\n${balanceLabel(fresh, found[0].id)}`}`);
+    }
+    return response({ type: 'pendingClient', request }, 'Ainda não consegui comprovar essa confirmação. Não vou reenviar o cadastro para evitar duplicação. Consulte novamente; se persistir, será necessária verificação pelo responsável.', ['Verificar resultado']);
+  }
+  async function execute(action: Action, before: State) {
+    if (action.type === 'financial' || action.type === 'retryFinancial') {
+      const draft = action.type === 'financial' ? action.draft : null;
+      const operation: FinancialOperation = action.type === 'retryFinancial' ? action.operation : { operationId: crypto.randomUUID(), confirmed: true, kind: draft!.kind, targetId: draft!.targetId, clientId: draft!.value.clientId!, date: draft!.value.date, observation: draft!.value.observation, items: draft!.value.items.map(i => ({ ...i, unitCents: i.unitCents! })), receivedCents: draft!.received ?? 0, amountCents: draft!.value.amountCents, allowCredit: draft!.allowCredit };
+      apply(response({ type: 'pendingFinancial', operation }, 'Conferindo sua confirmação…'));
+      try {
+        const result = await commitOperation(operation); const name = data.clients.find(c => c.id === result.clientId)?.fullName ?? 'Cliente';
+        apply(response({ type: 'idle' }, `${result.replayed ? 'Já estava salvo; não dupliquei.' : operation.kind.startsWith('delete_') ? 'Lançamento excluído.' : operation.kind.startsWith('edit_') ? 'Lançamento atualizado.' : 'Anotado com carinho!'}\n${name}\n${result.balanceCents >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(result.balanceCents))}`));
+      } catch (e) {
+        if (e instanceof ApiError && [400, 404, 422].includes(e.status) && draft) apply({ ...transition(before, 'Corrigir', snapshot()), text: `${e.message}\nO que devo corrigir?` });
+        else apply(response({ type: 'pendingFinancial', operation }, 'A confirmação foi enviada, mas não consegui comprovar o resultado. Vou usar o mesmo identificador, sem duplicar. Não comece outra operação ainda.', ['Verificar resultado']));
+      }
+      return;
+    }
+    if (action.type === 'client') {
+      const fresh = await refreshData(); const request = action.request; const person = fresh.clients.find(c => c.id === request.id);
+      if (request.mode !== 'create' && !person) throw new Error('Essa cliente não existe mais. Cancele e consulte novamente.');
+      if (request.mode === 'create' && fresh.clients.some(c => c.fullName.trim().toLocaleLowerCase('pt-BR') === request.data.fullName.trim().toLocaleLowerCase('pt-BR'))) throw new Error('Esse nome já existe. Cancele e consulte o cadastro antes de criar outra cliente.');
+      if (request.mode === 'delete' && (fresh.sales.some(s => s.clientId === request.id) || fresh.payments.some(p => p.clientId === request.id))) throw new Error('A cliente possui lançamentos. Exclusão bloqueada para preservar o histórico.');
+      const original = before.type === 'client' ? before.original : undefined;
+      if (original && person && !clientFields.every(([field]) => original[field] === person[field])) throw new Error('O cadastro mudou durante a conversa. Cancele e consulte novamente antes de alterar.');
+      request.beforeIds = fresh.clients.map(c => c.id); sessionStorage.setItem(clientKey, JSON.stringify(request));
+      apply(response({ type: 'pendingClient', request }, 'Enviando a confirmação do cadastro…'));
+      try {
+        if (request.mode === 'create') await data.addClient(request.data);
+        else if (request.mode === 'edit') await data.updateClient({ ...request.data, id: request.id! });
+        else await apiFetch(`/api/clients?id=${request.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmed: true, preserveHistory: true }) });
+        apply(await checkClient(request));
+      } catch (e) {
+        if (e instanceof ApiError && [400, 404, 409, 422].includes(e.status)) { sessionStorage.removeItem(clientKey); apply({ ...transition(before, 'Corrigir', fresh), text: e.message + '\nCorrija ou cancele para continuar.' }); }
+        else { try { apply(await checkClient(request)); } catch { apply(response({ type: 'pendingClient', request }, 'Não consegui verificar o cadastro. Não vou reenviar para evitar duplicação.', ['Verificar resultado'])); } }
+      }
+      return;
+    }
+    if (action.type === 'checkClient') { apply(await checkClient(action.request)); return; }
+    if (action.type === 'theme') { localStorage.setItem('ivone_theme', action.dark ? 'dark' : 'light'); document.documentElement.classList.toggle('dark', action.dark); return; }
+    if (action.type === 'backup') { await backup(); apply(response({ type: 'idle' }, 'Backup completo baixado. Nenhum registro foi alterado.')); return; }
+    if (action.type === 'logout') { await logout(); return; }
+    if (action.type === 'restore') {
+      const state = action.state; sessionStorage.setItem(restoreKey, JSON.stringify({ hash: state.hash, restoreId: state.restoreId })); apply(response({ ...state, attempted: true }, 'Conferindo a restauração…'));
+      try {
+        await apiFetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: state.data, restoreId: state.restoreId, backupFingerprint: state.fingerprint, confirmed: true }) });
+        sessionStorage.removeItem(restoreKey); const fresh = await refreshData(); apply(response({ type: 'idle' }, `Restauração concluída. Usuários foram preservados.\n${fresh.clients.map(c => `${c.fullName}: ${balanceLabel(fresh, c.id)}`).join('\n') || 'Não há clientes no arquivo.'}`));
+      } catch (e) {
+        if (e instanceof ApiError && [400, 404, 409, 422].includes(e.status)) { sessionStorage.removeItem(restoreKey); apply(response({ type: 'idle' }, `Restauração recusada pelo servidor: ${e.message}\nConsulte os registros e comece uma nova conversa de restauração se necessário.`)); }
+        else apply(response({ ...state, attempted: true }, `${e instanceof Error ? e.message : 'Não consegui comprovar o resultado.'}\nVou usar a mesma confirmação para verificar.`, ['Verificar resultado']));
       }
     }
   }
-  function begin(value: Interpretation) {
-    setCreditAccepted(false);
-    if (value.kind === 'unknown') { add(value.question!); return; }
-    if (value.installments) add('Posso registrar a venda, quanto você recebeu agora e o saldo pendente. Parcelas e vencimentos formais ainda não estão disponíveis. Nenhum plano de parcelas será criado.');
-    if (!value.clientId && !['pending', 'received'].includes(value.kind)) { add(value.question ?? 'Qual cliente? Escolha o nome certo.'); setDraft({ value, phase: 'client' }); return; }
-    if (value.kind === 'sale') {
-      if (value.items.some(i => !i.productName || i.unitCents === null) || value.question || value.needsReview || !validDate(value.date)) { add(value.question ?? 'Vamos completar o resumo.'); setDraft({ value, phase: 'editor' }); }
-      else { setDraft({ value, phase: 'payment' }); add('Encontrei esta venda. Ela já pagou?'); }
-    } else if (value.kind === 'payment') {
-      if (!value.amountCents || value.question) { add(value.question ?? 'Quanto ela pagou?'); setDraft({ value, phase: 'editor' }); }
-      else setDraft({ value, phase: 'confirm' });
-    }
-  }
-  async function chooseClient(clientId: string) {
-    if (!draft || busy.current) return;
-    const value = { ...draft.value, clientId, question: undefined };
-    if (value.kind === 'received' && !value.period) { setDraft({ value, phase: 'period' }); add('Você quer hoje, este mês ou todo o histórico?'); return; }
-    if (['balance', 'statement', 'received'].includes(value.kind)) {
-      busy.current = true; setWorking(true);
-      try { await query(value); setDraft(null); } catch { add('Não consegui consultar os registros. Tente novamente.'); }
-      finally { busy.current = false; setWorking(false); }
-    } else begin(value);
-  }
   async function send(text: string) {
-    const value = text.trim();
-    if (!value || busy.current || pendingError) return;
-    if (/^cancelar$/i.test(value) && !draft?.operation) { cancel(); setInput(''); return; }
-    if (draft?.phase === 'partial') {
-      try { const amount = brCents(value); if (amount <= 0 || amount > orderTotal) throw new Error(); add(value, true); setInput(''); setDraft({ ...draft, receivedCents: amount, phase: 'confirm' }); }
-      catch { add(`Quanto recebeu agora? Use um valor maior que zero e até ${currency(orderTotal)}.`); }
-      return;
-    }
-    if (draft) { add('Conclua, corrija ou cancele o resumo antes de começar outra anotação.'); return; }
-    busy.current = true; setWorking(true); add(value, true); setInput('');
-    try {
-      const data = await refreshData();
-      const parsed = interpret(value, data.clients);
-      if (parsed.kind === 'received' && parsed.filterClient && !parsed.clientId) { add(parsed.question!); setDraft({ value: parsed, phase: 'client' }); }
-      else if (parsed.kind === 'received' && !parsed.period) { add(parsed.question!); setDraft({ value: parsed, phase: 'period' }); }
-      else if (['pending', 'received'].includes(parsed.kind) || (['balance', 'statement'].includes(parsed.kind) && parsed.clientId)) await query(parsed, data);
-      else begin(parsed);
-    } catch { add('Não consegui atualizar os dados. Não anotei nada. Tente novamente.'); }
+    if (!text.trim() || busy.current) return;
+    if (text === 'Anexar backup') { attachment.current?.click(); return; }
+    busy.current = true; setWorking(true); setInput(''); append(text, true); const before = current.current.state;
+    try { const fresh = await refreshData(); const next = transition(before, text, fresh); apply(next); if (next.action) await execute(next.action, before); }
+    catch (e: any) { apply(response(before, e.message || 'Não consegui atualizar. Nenhuma nova confirmação foi enviada.', current.current.choices)); }
     finally { busy.current = false; setWorking(false); }
   }
-  function cancel() { if (draft?.operation || busy.current) return; setDraft(null); setInput(''); add('Cancelado. Nenhum registro foi salvo.'); }
-  async function confirm() {
-    if (!draft || busy.current || (needsCredit && !creditAccepted && !draft.operation)) return;
-    const value = draft.value;
-    const operation: FinancialOperation = draft.operation ?? { operationId: crypto.randomUUID(), confirmed: true, kind: value.kind as 'sale' | 'payment', clientId: value.clientId!, date: value.date, observation: value.observation, ...(value.kind === 'sale' ? { items: value.items.map(item => ({ ...item, unitCents: item.unitCents! })), receivedCents: draft.receivedCents! } : { amountCents: value.amountCents!, allowCredit: creditAccepted }) };
-    busy.current = true; setWorking(true); setDraft({ ...draft, operation });
+  async function attach(file: File) {
+    if (busy.current || current.current.state.type !== 'attachment') return;
+    busy.current = true; setWorking(true); append('Anexei um arquivo de backup.', true); const before = current.current;
     try {
-      const result = await commitOperation(operation);
-      sessionStorage.removeItem(pendingKey);
-      add(`${result.replayed ? 'Essa confirmação já havia sido salva; não dupliquei o lançamento.' : 'Anotado com carinho 🌷'}\n${result.balanceCents >= 0 ? `Saldo pendente: ${currency(result.balanceCents)}` : `Crédito: ${currency(-result.balanceCents)}`}`);
-      setDraft(null); setInput('');
-    } catch (error: any) {
-      if (error instanceof ApiError && [400, 404, 422].includes(error.status)) { sessionStorage.removeItem(pendingKey); setDraft({ ...draft, operation: undefined, phase: 'editor' }); add(error.message); }
-      else { setDraft({ ...draft, operation, phase: 'retry' }); add('Ainda não consegui confirmar o resultado. Tente novamente com esta mesma confirmação; não crie outra anotação para substituir esta.'); }
-    } finally { busy.current = false; setWorking(false); }
+      if (file.size > 4_000_000) throw new Error('Esse arquivo é grande demais para a API atual. Nenhum dado foi alterado.');
+      const content = JSON.parse(await file.text()); const records = content.data ?? content;
+      if (!['clients', 'sales', 'payments'].every(key => Array.isArray(records[key]))) throw new Error('Arquivo incompleto. Preciso de clientes, vendas e pagamentos.');
+      const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(records))))).map(byte => byte.toString(16).padStart(2, '0')).join(''); const pending = JSON.parse(sessionStorage.getItem(restoreKey) ?? 'null');
+      if (pending && pending.hash !== hash) throw new Error('Escolha o mesmo arquivo da restauração pendente.');
+      const fingerprint = await backup();
+      apply({ state: { type: 'restore', data: records, hash, restoreId: pending?.restoreId ?? crypto.randomUUID(), fingerprint, attempted: !!pending }, text: pending ? 'Vou verificar a restauração anterior com o mesmo identificador.' : 'Baixei um backup atual. Confira antes de substituir os registros.', choices: pending ? ['Verificar resultado'] : ['Confirmar', 'Corrigir', 'Cancelar'], summary: `Restaurar backup\nClientes: ${records.clients.length}\nVendas: ${records.sales.length}\nPagamentos: ${records.payments.length}\nEsses registros atuais serão substituídos. Usuários e configurações serão preservados.` });
+    } catch (e: any) { apply({ ...before, text: e.message || 'Não consegui abrir esse arquivo.' }); }
+    finally { busy.current = false; setWorking(false); }
   }
-  function shortcut(action: typeof shortcuts[number]['action']) {
-    if (draft || busy.current || pendingError) return;
-    if (action === 'pending') { void send('Quem está devendo?'); return; }
-    if (action === 'statement') { add('De qual cliente você quer o extrato?'); setDraft({ phase: 'client', value: { kind: 'statement', candidates: clients, items: [], date: today(), observation: '', installments: false } }); return; }
-    begin({ kind: action, candidates: clients, items: action === 'sale' ? [{ productName: '', productCode: '', quantity: 1, unitCents: null }] : [], date: today(), observation: '', installments: false });
-  }
-  const footer = <><div className="chat-shortcuts" aria-label="Atalhos">{shortcuts.map(({ label, icon: Icon, action }) => <button key={label} disabled={!!draft || working || isRefreshing || !!dataError} onClick={() => shortcut(action)}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</div><form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(input); }}><input ref={field} value={input} onChange={event => setInput(event.target.value)} placeholder={draft?.phase === 'partial' ? 'Quanto recebeu agora?' : 'Conte o que vendeu ou recebeu…'} aria-label="Mensagem" maxLength={1500} autoComplete="off" disabled={working || (!!draft && draft.phase !== 'partial')} /><button type="submit" aria-label="Enviar mensagem" disabled={!input.trim() || working || (!!draft && draft.phase !== 'partial')}><ArrowUp size={22} /></button></form><p className="chat-footer-note">Só anoto depois da sua confirmação.</p></>;
-  return <ChatFrame revision={`${messages.length}:${draft?.phase}:${working}`} footer={footer} actions={<><a href="/?modo=gestao">Gestão completa</a><button disabled={working || !!draft?.operation} onClick={async () => { try { await logout(); } catch { add('Não consegui encerrar a sessão. Tente novamente.'); } }}>Sair</button></>}>
-    {pendingError && <div className="chat-bubble" role="alert"><p>{pendingError}</p></div>}
-    {dataError && <div className="chat-bubble" role="alert"><p>{dataError}</p><button onClick={async () => { try { await refreshData(); add('Registros atualizados.'); } catch { add('Ainda não consegui atualizar.'); } }}>Tentar atualizar</button></div>}
-    {messages.map(message => <div key={message.id} className={`chat-bubble ${message.own ? 'chat-own' : ''}`}><p>{message.text}</p><span className="chat-bubble-caption">{message.own ? 'Você ✓✓' : 'Caderninho'}</span></div>)}
-    {draft?.phase === 'client' && <section className="chat-confirm"><h2>Qual cliente?</h2><div className="chat-client-options">{(draft.value.candidates.length ? draft.value.candidates : clients).map(c => <button key={c.id} disabled={working} onClick={() => void chooseClient(c.id)}>{c.fullName}</button>)}</div>{!clients.length && <p>Cadastre a cliente pela Gestão completa antes de anotar.</p>}<div className="chat-confirm-secondary"><button disabled={working} onClick={cancel}>Cancelar</button></div></section>}
-    {draft?.phase === 'editor' && <OperationEditor value={draft.value} clients={clients} onDone={begin} onCancel={cancel} />}
-    {draft?.phase === 'period' && <section className="chat-confirm"><h2>Qual período?</h2>{(['today', 'month', 'all'] as const).map((period, i) => <button key={period} disabled={working} onClick={async () => { busy.current = true; setWorking(true); try { await query({ ...draft.value, period }); setDraft(null); } catch { add('Não consegui consultar. Tente novamente.'); } finally { busy.current = false; setWorking(false); } }}>{['Hoje', 'Este mês', 'Todo o histórico'][i]}</button>)}<button onClick={cancel}>Cancelar</button></section>}
-    {draft && ['payment', 'partial', 'confirm', 'retry'].includes(draft.phase) && <section className="chat-confirm" aria-label="Resumo para confirmação"><div className="chat-confirm-tag">Confira com carinho</div><h2>{pendingTitle ?? (draft.value.kind === 'sale' ? 'Nova venda' : 'Recebimento')}</h2><dl><div><dt>Cliente</dt><dd>{client?.fullName ?? 'Cliente do registro anterior'}</dd></div><div><dt>Data</dt><dd>{dateLabel(draft.value.date)}</dd></div>{draft.value.items.map((item, i) => <div key={i}><dt>{item.quantity} {item.productName}</dt><dd>{currency(lineTotal(item.quantity, item.unitCents!))}<small>{currency(item.unitCents!)} por unidade</small></dd></div>)}{draft.value.kind === 'sale' && draft.value.items.length > 0 && <div className="chat-total"><dt>Total da venda</dt><dd>{currency(orderTotal)}</dd></div>}{draft.value.observation && <div><dt>Observações</dt><dd>{draft.value.observation}</dd></div>}</dl>
-      {draft.phase === 'payment' && <><p>Ela já pagou?</p><div className="chat-payment-options"><button disabled={working} onClick={() => setDraft({ ...draft, receivedCents: orderTotal, phase: 'confirm' })}>Pagou tudo</button><button disabled={working} onClick={() => { setDraft({ ...draft, phase: 'partial' }); add('Quanto ela pagou agora? Digite o valor recebido.'); field.current?.focus(); }}>Pagou uma parte</button><button disabled={working} onClick={() => setDraft({ ...draft, receivedCents: 0, phase: 'confirm' })}>Ainda não pagou</button></div></>}
-      {draft.phase === 'partial' && <p>Digite abaixo quanto foi recebido agora. O restante ficará como saldo pendente, sem criar parcelas.</p>}
-      {['confirm', 'retry'].includes(draft.phase) && <><dl>{!draft.operation?.kind.startsWith('delete_') && <div><dt>{draft.operation?.kind === 'edit_payment' ? 'Valor do recebimento' : 'Recebido agora'}</dt><dd>{currency(received)}</dd></div>}{draft.value.kind === 'sale' && (!draft.operation || draft.operation.kind === 'sale') && <div><dt>Restante após este recebimento</dt><dd>{currency(orderTotal - received)}</dd></div>}{!draft.operation && <div><dt>{predictedBalance >= 0 ? 'Saldo previsto da cliente' : 'Crédito previsto'}</dt><dd>{currency(Math.abs(predictedBalance))}</dd></div>}</dl>{needsCredit && !draft.operation && <label className="chat-credit"><input type="checkbox" checked={creditAccepted} onChange={event => setCreditAccepted(event.target.checked)} />Confirmo que o valor excedente ficará como crédito.</label>}<p>{draft.phase === 'retry' ? 'A confirmação enviada será reutilizada para evitar duplicação. O servidor informará o saldo atual.' : 'Venda e recebimento serão salvos juntos somente ao confirmar.'}</p><button className="chat-confirm-primary" disabled={working || isRefreshing || !!dataError || (!!needsCredit && !creditAccepted && !draft.operation)} onClick={() => void confirm()}>{working ? 'Conferindo e salvando…' : draft.phase === 'retry' ? 'Tentar mesma confirmação' : 'Confirmar'}</button></>}
-      {!draft.operation && <div className="chat-confirm-secondary"><button disabled={working} onClick={() => setDraft({ ...draft, phase: 'editor', receivedCents: undefined })}>Corrigir</button><button disabled={working} onClick={cancel}>Cancelar</button></div>}
-    </section>}
+  const blocked = reply.state.type === 'blocked';
+  return <ChatFrame revision={`${messages.length}:${working}`} actions={<button disabled={working || reply.state.type !== 'idle'} onClick={() => void send('Sair')}>Sair</button>} footer={<>
+    <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(input); }}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Converse com seu Caderninho…" aria-label="Mensagem" maxLength={2000} autoComplete="off" disabled={working || blocked} /><button type="submit" aria-label="Enviar mensagem" disabled={!input.trim() || working || blocked}><ArrowUp size={22} /></button></form>
+    {reply.state.type === 'attachment' && <input ref={attachment} hidden aria-label="Arquivo de backup" type="file" accept=".json" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void attach(file); }} />}
+    <p className="chat-footer-note">Só anoto depois da sua confirmação.</p>
+  </>}>
+    {dataError && <div className="chat-bubble" role="alert"><p>{dataError}</p><button disabled={working} onClick={() => void send('Verificar resultado')}>Tentar atualizar</button></div>}
+    {messages.map(message => <div key={message.id} className={`chat-bubble ${message.own ? 'chat-own' : ''} ${message.summary ? 'chat-conversation-summary' : ''}`}><p>{message.text}</p>{message.summary && <p className="chat-summary-text">{message.summary}</p>}<span className="chat-bubble-caption">{message.own ? 'Você ✓✓' : 'Caderninho'}</span></div>)}
+    {!!reply.choices.length && <div className="chat-bubble chat-conversation-options" aria-label="Respostas disponíveis"><div className="chat-client-options">{reply.choices.map((choice, index) => <button key={`${index}:${choice}`} data-choice={choice} disabled={working || isRefreshing || blocked} onClick={() => void send(choice)}>{choice}</button>)}</div></div>}
   </ChatFrame>;
 }
