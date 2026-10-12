@@ -1,5 +1,7 @@
 # Preparação da dev para main — 12/10/2026
 
+Atualização posterior: a substituição por Neon foi implementada localmente. Redis não é mais requisito do código atual; a ativação autorizada dos SQL 001/002 ainda está pendente. Veja [neon-auth.md](neon-auth.md). O conteúdo abaixo registra a etapa anterior.
+
 ## Código consolidado
 
 - Mobile autenticado mantém somente a conversa. Desktop mantém gestão tradicional; não houve reconstrução do aplicativo.

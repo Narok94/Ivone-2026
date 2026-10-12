@@ -23,25 +23,17 @@ The lockfile was repaired after `npm ci` rejected pre-existing inconsistencies. 
 - All business API handlers enforce session validation directly, including Vercel entry points. Unsafe methods also require the session's CSRF token and a matching `Origin`. Login requires same-origin JSON. No cross-origin CORS permission is granted locally.
 - Session and business API responses use `Cache-Control: no-store`. Responses arriving after a session change are discarded by the shared frontend request helper.
 
-## External configuration pending
+## Shared authentication storage — Neon
 
-Production and Vercel require shared session storage. Configure an HTTPS Redis REST service compatible with the [Upstash REST API](https://upstash.com/docs/redis/features/restapi), with support for `SET ... EX ... NX`, `GET`, `DEL` and atomic Lua `EVAL` (login attempt counters with expiration):
+The current implementation uses the existing Neon PostgreSQL connection for production sessions and atomic PIN-attempt counters. Apply db/002_auth_sessions.sql manually only after authorization. No Redis service or Redis environment variables are required. See [neon-auth.md](neon-auth.md) for the current implementation, schema and validation.
 
-- `AUTH_REDIS_REST_URL`: HTTPS service endpoint, server environment only.
-- `AUTH_REDIS_REST_TOKEN`: service access token, server environment only; never commit its value.
-- `AUTH_APP_ORIGIN`: optional canonical browser origin, e.g. the deployment's HTTPS origin. Without it, the request's host and production/development protocol determine the expected origin. Set it explicitly for reverse proxies or custom origin arrangements.
-
-No service or environment configuration was created or changed by this task. Missing/failed production storage prevents session creation and fails closed with `503`. There is no in-memory fallback in production or Vercel.
-
-Single-process local development uses an ephemeral memory store only with `NODE_ENV=development` (set by the local server if absent), or `test`. Restarting that process logs users out. Distributed development must use the shared store.
-
-The existing Neon connection is still necessary for real PIN login and business operations. Tests substitute the database module before any handler import, so they never load its environment or reach Neon.
+Cookies, CSRF, absolute expiration and server-side logout are unchanged. Production/Vercel never falls back to memory. Local development/test use memory; the fictional launcher remains isolated from Neon. Schema or storage failure denies authentication. AUTH_APP_ORIGIN remains optional for the correct HTTPS origin of each environment.
 
 ## Verification
 
 - `npm run lint`: TypeScript checks.
 - `npm run build`: production frontend build.
-- `npm test`: backend handlers, local Express HTTP integration, production session store adapter and frontend React effects in a simulated DOM. Redis is simulated. Financial writes/restores run only on isolated in-memory PostgreSQL fixtures, never Neon.
+- `npm test`: backend handlers, local Express HTTP integration, production session store adapter and frontend React effects in a simulated DOM. PostgreSQL authentication is covered by isolated in-memory tests. Financial writes/restores run only on isolated in-memory PostgreSQL fixtures, never Neon.
 - Coverage includes missing/tampered cookies, all business APIs, login, page reload, absolute expiration, CSRF failures, shared sessions, server-side logout, storage outage, forged localStorage and `401` cleanup.
 
 Before deployment, verify the actual Redis service, HTTPS origin/cookie behavior and complete browser workflows in a staging environment with a separate test database. Production Neon was not inspected or tested. No restoration was executed even against a test database.

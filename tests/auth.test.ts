@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 // Redirect the DB module before importing any handler: tests cannot reach Neon,
 // load dotenv, read database credentials or run initialization.
 registerHooks({ resolve(specifier, context, nextResolve) {
-  if (specifier === './db.js' && context.parentURL?.includes('/api/')) {
+  if ((specifier === './db.js' && context.parentURL?.includes('/api/')) || specifier.endsWith('/api/db.js')) {
     return { url: new URL('./fixtures/database.mjs', import.meta.url).href, shortCircuit: true };
   }
   return nextResolve(specifier, context);
@@ -199,43 +199,5 @@ test('authentication, API authorization, CSRF, expiration and server-side logout
     await login(req, res as any);
     assert.equal(res.code, 503);
     assert.equal(res.headers['set-cookie'], undefined);
-  });
-  await t.test('shared REST storage: Secure cookies, independent function instance, revocation, failure closed', async () => {
-    process.env.AUTH_REDIS_REST_URL = 'https://session-store.invalid';
-    process.env.AUTH_REDIS_REST_TOKEN = randomBytes(32).toString('hex');
-    const shared = new Map<string, string>();
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (_url, options) => {
-      const [op, key, value, expiry, ttl, nx] = JSON.parse(options!.body as string);
-      let result: unknown;
-      if (op === 'SET') {
-        assert.equal(expiry, 'EX'); assert.equal(ttl, 28800); assert.equal(nx, 'NX');
-        shared.set(key, value); result = 'OK';
-      } else if (op === 'GET') result = shared.get(key) || null;
-      else if (op === 'DEL') result = Number(shared.delete(key));
-      else throw new Error('Unexpected command');
-      return Response.json({ result });
-    };
-    try {
-      const req = request();
-      req.headers.host = 'app.invalid'; req.headers.origin = 'https://app.invalid';
-      const res = response();
-      await auth.createSession(req, res, { id: user.id, username: user.username });
-      assert.match(res.headers['set-cookie'], /^__Host-ivone_session=/);
-      assert.match(res.headers['set-cookie'], /; Secure$/);
-      req.headers.cookie = res.headers['set-cookie'].split(';')[0];
-      const replicaPath = '../server/lib/session.ts?replica';
-      const replica = await import(replicaPath);
-      assert.equal((await replica.readSession(req))?.user.id, user.id);
-      await replica.revokeSession(req);
-      assert.equal(await auth.readSession(req), null);
-      globalThis.fetch = async () => { throw new Error('private provider failure'); };
-      const failed = response();
-      await auth.requireSession(req, failed);
-      assert.equal(failed.code, 503);
-      assert.ok(!JSON.stringify(failed.body).includes('private'));
-      globalThis.fetch = async () => Response.json({ result: null });
-      await assert.rejects(auth.revokeSession(req), /Session storage unavailable/);
-    } finally { globalThis.fetch = originalFetch; }
   });
 });

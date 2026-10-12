@@ -1,5 +1,7 @@
 # Publicação: verificação de 12/10/2026
 
+Atualização posterior: a substituição por Neon foi implementada localmente. Redis não é mais requisito do código atual; a ativação autorizada dos SQL 001/002 ainda está pendente. Veja [neon-auth.md](neon-auth.md). O conteúdo abaixo registra a etapa anterior.
+
 ## Revisão e entrega
 
 Revisadas as alterações locais da `dev`, incluindo arquivos novos, diff de frontend/backend, documentação e testes. O coordenador conversacional substitui as funções do editor antigo; nenhum componente desktop foi excluído. As únicas remoções são o editor mobile sem referências e estilos obsoletos. Todas as alterações concluídas entram no commit; credenciais, resultados e arquivos temporários permanecem fora do Git. A referência `origin/dev` foi atualizada antes do commit, sem divergências.
