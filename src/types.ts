@@ -15,6 +15,7 @@ export interface Client {
 }
 
 export interface Sale {
+  clientName?: string;
   id: string;
   clientId: string;
   saleDate: string; 
@@ -27,6 +28,7 @@ export interface Sale {
 }
 
 export interface Payment {
+  clientName?: string;
   id: string;
   clientId: string;
   paymentDate: string;

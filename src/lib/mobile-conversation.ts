@@ -2,17 +2,18 @@ import type { Client, Payment, Sale } from '../types';
 import { findClients, interpret, normalize, type Interpretation } from './conversation';
 import { brCents, cents, clientBalance, currency, dateLabel, lineTotal, MAX_CENTS, sumCents, today, validDate, type FinancialOperation } from './finance';
 
-export type Snapshot = { clients: Client[]; sales: Sale[]; payments: Payment[] };
+export type Snapshot = { clients: Client[]; sales: Sale[]; payments: Payment[]; remoteSearch?: boolean };
 export type ClientData = Omit<Client, 'id'>;
 export const clientFields: [keyof ClientData, string][] = [['fullName', 'nome'], ['phone', 'telefone'], ['email', 'e-mail'], ['cpf', 'CPF'], ['cep', 'CEP'], ['street', 'rua'], ['number', 'número'], ['complement', 'complemento'], ['neighborhood', 'bairro'], ['city', 'cidade'], ['state', 'estado'], ['observation', 'observações']];
 const emptyClient = (): ClientData => Object.fromEntries(clientFields.map(([key]) => [key, ''])) as ClientData;
-export type FinanceDraft = { value: Interpretation; kind: FinancialOperation['kind']; targetId?: string; received?: number; allowCredit?: boolean; expectedRemaining?: number; paymentHint?: 'all' | 'none'; guided?: boolean; moreAsked?: boolean; needsDate?: boolean; validatedQuantity?: number[] };
+export type FinanceDraft = { value: Interpretation; kind: FinancialOperation['kind']; sourceText?: string; targetId?: string; received?: number; allowCredit?: boolean; expectedRemaining?: number; paymentHint?: 'all' | 'none'; guided?: boolean; moreAsked?: boolean; needsDate?: boolean; validatedQuantity?: number[] };
 type QueryKind = 'client' | 'balance' | 'statement' | 'received';
 export type State =
   | { type: 'idle' }
-  | { type: 'choose'; candidates: Client[]; purpose: QueryKind | 'editClient' | 'deleteClient' | 'editSale' | 'deleteSale' | 'editPayment' | 'deletePayment' | 'finance'; draft?: FinanceDraft }
+  | { type: 'choose'; candidates: Client[]; purpose: QueryKind | 'editClient' | 'deleteClient' | 'editSale' | 'deleteSale' | 'editPayment' | 'deletePayment' | 'finance'; draft?: FinanceDraft; query?: string; offset?: number; hasMore?: boolean }
+  | { type: 'missingClient'; query: string; selection: Extract<State, { type: 'choose' }> }
   | { type: 'finance'; draft: FinanceDraft; step: 'product' | 'quantity' | 'price' | 'priceMode' | 'more' | 'payment' | 'partial' | 'credit' | 'date' | 'notes' | 'correct' | 'confirm'; index: number }
-  | { type: 'client'; data: ClientData; original?: Client; step: 'name' | 'phone' | 'details' | 'field' | 'value' | 'confirm'; field?: keyof ClientData; deleting?: boolean }
+  | { type: 'client'; data: ClientData; original?: Client; step: 'name' | 'phone' | 'details' | 'field' | 'value' | 'confirm'; field?: keyof ClientData; deleting?: boolean; resume?: FinanceDraft }
   | { type: 'record'; kind: 'sale' | 'payment'; deleting: boolean; clientId: string; ids: string[] }
   | { type: 'period'; query: 'reports' | 'history' | 'received'; clientId?: string }
   | { type: 'theme'; dark: boolean }
@@ -21,8 +22,8 @@ export type State =
   | { type: 'pendingFinancial'; operation: FinancialOperation }
   | { type: 'pendingClient'; request: ClientRequest }
   | { type: 'blocked'; reason: string };
-export type ClientRequest = { mode: 'create' | 'edit' | 'delete'; data: ClientData; id?: string; beforeIds: string[] };
-export type Action = { type: 'financial'; draft: FinanceDraft } | { type: 'retryFinancial'; operation: FinancialOperation } | { type: 'client'; request: ClientRequest } | { type: 'checkClient'; request: ClientRequest } | { type: 'theme'; dark: boolean } | { type: 'backup' } | { type: 'restore'; state: Extract<State, { type: 'restore' }> } | { type: 'logout' };
+export type ClientRequest = { mode: 'create' | 'edit' | 'delete'; data: ClientData; id?: string; beforeIds: string[]; resume?: FinanceDraft };
+export type Action = { type: 'searchClients'; selection: Extract<State, { type: 'choose' }>; query: string; offset: number } | { type: 'checkDuplicate'; client: Extract<State, { type: 'client' }> } | { type: 'financial'; draft: FinanceDraft } | { type: 'retryFinancial'; operation: FinancialOperation } | { type: 'client'; request: ClientRequest } | { type: 'checkClient'; request: ClientRequest } | { type: 'theme'; dark: boolean } | { type: 'backup' } | { type: 'restore'; state: Extract<State, { type: 'restore' }> } | { type: 'logout' };
 export type Reply = { state: State; text: string; choices: string[]; summary?: string; action?: Action };
 const idle: State = { type: 'idle' };
 function answer(state: State, text: string, choices: string[] = [], summary?: string, action?: Action): Reply { return { state, text, choices, summary, action }; }
@@ -43,7 +44,7 @@ export function parseChatSale(text: string, clients: Client[]): FinanceDraft {
   const body = match ? working.slice(0, match.index).trim() : working;
   const value = interpret(body, clients);
   if (observation) value.observation = observation[1].trim();
-  const draft: FinanceDraft = { value, kind: 'sale', needsDate: !validDate(value.date) };
+  const draft: FinanceDraft = { value, kind: 'sale', sourceText: text, needsDate: !validDate(value.date) };
   if (match) {
     const payment = normalize(match[1]).replace(/[.!]$/, '');
     if (/^(?:tudo|integralmente)$/.test(payment)) draft.paymentHint = 'all';
@@ -98,8 +99,8 @@ function financeStep(draft: FinanceDraft, step: Extract<State, { type: 'finance'
     case 'confirm': return answer(state, 'Confira com carinho. Só vou salvar depois de Confirmar.', confirmChoices, financialSummary(draft, data));
   }
 }
-function readyFinance(draft: FinanceDraft, data: Snapshot): Reply {
-  if (!draft.value.clientId) return choose(data, 'finance', '', draft, draft.value.candidates);
+export function readyFinance(draft: FinanceDraft, data: Snapshot): Reply {
+  if (!draft.value.clientId) return choose(data, 'finance', draft.value.clientQuery ?? '', draft, draft.value.candidates);
   if (draft.kind.startsWith('delete_')) return financeStep(draft, 'confirm', data);
   if (draft.needsDate || !validDate(draft.value.date)) return financeStep(draft, 'date', data);
   if (draft.value.kind === 'sale') {
@@ -127,13 +128,32 @@ function readyFinance(draft: FinanceDraft, data: Snapshot): Reply {
   return financeStep(draft, 'confirm', data);
 }
 function choose(data: Snapshot, purpose: Extract<State, { type: 'choose' }>['purpose'], text: string, draft?: FinanceDraft, candidates?: Client[]): Reply {
+  if (data.remoteSearch) {
+    const query = text.replace(/^(?:mostra|mostrar|ver|consultar)?\s*(?:o\s+)?(?:extrato|saldo|divida)\s*(?:da|de|do)?\s*/i, '').replace(/^quanto\s+(?:a\s+|o\s+)?(.+?)\s+(?:deve|esta devendo).*$/i, '$1').trim();
+    const selection: Extract<State, { type: 'choose' }> = { type: 'choose', purpose, draft, candidates: [], query, offset: 0 };
+    return answer(selection, query ? 'Vou procurar esse nome…' : 'Qual é o nome da cliente? Pode escrever parte do nome.', ['Cancelar'], undefined, query ? { type: 'searchClients', selection, query, offset: 0 } : undefined);
+  }
   const match = text ? findClients(text, data.clients) : { candidates: candidates ?? [], exact: false };
-  const state: Extract<State, { type: 'choose' }> = { type: 'choose', purpose, candidates: match.candidates.length ? match.candidates : data.clients, draft };
+  const state: Extract<State, { type: 'choose' }> = { type: 'choose', purpose, candidates: text ? match.candidates : candidates?.length ? candidates : data.clients, draft };
   if (text && match.exact && match.candidates.length === 1) return choosePerson(state, match.candidates[0], data);
   return answer(state, data.clients.length ? 'Qual cliente? Digite o nome completo ou escolha para não confundir.' : 'Ainda não há clientes. Cancele e diga “Cadastrar cliente” para começar.', [...state.candidates.map(c => c.fullName), 'Cancelar']);
 }
+export function searchReply(selection: Extract<State, { type: 'choose' }>, result: { clients: Client[]; query: string; offset: number; hasMore: boolean; uncertain?: boolean }): Reply {
+  if (!result.clients.length) return answer({ type: 'missingClient', query: result.query, selection }, `Não encontrei ${result.query} cadastrada. Deseja cadastrar essa cliente agora?`, ['Sim, cadastrar', 'Buscar novamente', 'Cancelar operação']);
+  const state = { ...selection, candidates: result.clients, query: result.query, offset: result.offset, hasMore: result.hasMore };
+  return answer(state, `${result.uncertain ? 'Encontrei nomes parecidos. Confira com cuidado:' : 'Encontrei estas clientes:'}\n${result.clients.map((c, i) => `${i + 1}. ${c.fullName}${result.clients.filter(p => normalize(p.fullName) === normalize(c.fullName)).length > 1 ? ` · telefone: ${c.phone || 'não informado'} · ${c.id.slice(-6)}` : ''}`).join('\n')}\nQual delas?`, result.clients.map((c, i) => `${i + 1}. ${c.fullName}`).concat(result.hasMore ? ['Mais resultados', 'Buscar novamente', 'Cancelar'] : ['Buscar novamente', 'Cancelar']));
+}
+export function resumeClient(request: ClientRequest, person: Client, data: Snapshot): Reply {
+  if (!request.resume) return answer(idle, `Cadastro de ${person.fullName} salvo.`);
+  const next = readyFinance({ ...request.resume, value: { ...request.resume.value, clientId: person.id, candidates: [person] } }, { ...data, clients: [person, ...data.clients.filter(c => c.id !== person.id)] });
+  return { ...next, text: `Cadastro de ${person.fullName} salvo. Vamos continuar a venda.\n${next.text}` };
+}
 function choosePerson(state: Extract<State, { type: 'choose' }>, person: Client, data: Snapshot): Reply {
-  if (state.purpose === 'finance') return readyFinance({ ...state.draft!, value: { ...state.draft!.value, clientId: person.id, candidates: [person], question: undefined } }, data);
+  if (state.purpose === 'finance') {
+    const draft = state.draft!;
+    const parsed = draft.sourceText && draft.kind === 'sale' ? parseChatSale(draft.sourceText, [person]) : draft;
+    return readyFinance({ ...draft, sourceText: undefined, value: { ...parsed.value, clientId: person.id, candidates: [person], question: undefined } }, data);
+  }
   if (state.purpose === 'client') return answer(idle, `${clientSummary(person)}\n${balanceText(data, person.id)}`);
   if (state.purpose === 'balance') return answer(idle, `${person.fullName}\n${balanceText(data, person.id)}`);
   if (state.purpose === 'received') return answer({ type: 'period', query: 'received', clientId: person.id }, `Qual período dos recebimentos de ${person.fullName}?`, ['Hoje', 'Este mês', 'Todo o histórico', 'Cancelar']);
@@ -151,20 +171,27 @@ function choosePerson(state: Extract<State, { type: 'choose' }>, person: Client,
 const recordDate = (row: Sale | Payment) => 'saleDate' in row ? row.saleDate : row.paymentDate;
 function recordLabel(row: Sale | Payment, i: number) { return `${i + 1}. ${dateLabel(recordDate(row))} · ${'productName' in row ? row.productName + ' · ' + currency(cents(row.total)) : currency(cents(row.amount))}`; }
 function filterPeriod(date: string, period: string) { return period === 'today' ? date === today() : period === 'month' ? date.startsWith(today().slice(0, 7)) : true; }
+function ledgerPeople(data: Snapshot) {
+  const names = new Map(data.clients.map(c => [c.id, c.fullName]));
+  for (const row of [...data.sales, ...data.payments]) if (!names.has(row.clientId)) names.set(row.clientId, row.clientName ?? 'Cliente');
+  return [...names].map(([id, fullName]) => ({ id, fullName }));
+}
 function period(text: string): 'today' | 'month' | 'all' | undefined { const c = normalize(text); return /hoje/.test(c) ? 'today' : /(?:este|esse|neste|nesse) mes/.test(c) ? 'month' : /todo|tudo|historico completo/.test(c) ? 'all' : undefined; }
 export function history(data: Snapshot, range: string, clientId?: string) {
   const person = data.clients.find(c => c.id === clientId);
-  const entries = [...data.sales.filter(s => !clientId || s.clientId === clientId).map(s => ({ date: s.saleDate, id: s.id, text: `${dateLabel(s.saleDate)} · ${data.clients.find(c => c.id === s.clientId)?.fullName ?? 'Cliente'} · ${s.quantity} ${s.productName}: ${currency(cents(s.total))}` })), ...data.payments.filter(p => !clientId || p.clientId === clientId).map(p => ({ date: p.paymentDate, id: p.id, text: `${dateLabel(p.paymentDate)} · ${data.clients.find(c => c.id === p.clientId)?.fullName ?? 'Cliente'} · Recebimento: ${currency(cents(p.amount))}` }))].filter(e => filterPeriod(e.date, range)).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const names = new Map(ledgerPeople(data).map(c => [c.id, c.fullName]));
+  const entries = [...data.sales.filter(s => !clientId || s.clientId === clientId).map(s => ({ date: s.saleDate, id: s.id, text: `${dateLabel(s.saleDate)} · ${names.get(s.clientId) ?? 'Cliente'} · ${s.quantity} ${s.productName}: ${currency(cents(s.total))}` })), ...data.payments.filter(p => !clientId || p.clientId === clientId).map(p => ({ date: p.paymentDate, id: p.id, text: `${dateLabel(p.paymentDate)} · ${names.get(p.clientId) ?? 'Cliente'} · Recebimento: ${currency(cents(p.amount))}` }))].filter(e => filterPeriod(e.date, range)).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
   return `${person ? `Extrato de ${person.fullName}` : 'Histórico'} (${range === 'today' ? 'hoje' : range === 'month' ? 'este mês' : 'todo o histórico'})\n${entries.map(e => e.text).join('\n') || 'Ainda não há lançamentos nesse período.'}`;
 }
 export function report(data: Snapshot, range: string) {
   const sales = data.sales.filter(s => filterPeriod(s.saleDate, range)); const payments = data.payments.filter(p => filterPeriod(p.paymentDate, range));
-  const byClient = data.clients.map(c => ({ name: c.fullName, total: sumCents(sales.filter(s => s.clientId === c.id).map(s => cents(s.total))) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)).slice(0, 5);
+  const people = ledgerPeople(data);
+  const byClient = people.map(c => ({ name: c.fullName, total: sumCents(sales.filter(s => s.clientId === c.id).map(s => cents(s.total))) })).filter(c => c.total > 0).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name)).slice(0, 5);
   const products = new Map<string, number>(); sales.forEach(s => products.set(s.productName, (products.get(s.productName) ?? 0) + s.quantity));
-  const pending = sumCents(data.clients.map(c => Math.max(0, clientBalance(data.sales, data.payments, c.id))));
+  const pending = sumCents(people.map(c => Math.max(0, clientBalance(data.sales, data.payments, c.id))));
   return `Relatório (${range === 'today' ? 'hoje' : range === 'month' ? 'este mês' : 'todo o histórico'})\nVendas: ${currency(sumCents(sales.map(s => cents(s.total))))}\nRecebido: ${currency(sumCents(payments.map(p => cents(p.amount))))}\nPendências atuais de todo o histórico: ${currency(pending)}\nClientes que mais compraram:\n${byClient.map(c => `${c.name}: ${currency(c.total)}`).join('\n') || 'Nenhuma venda.'}\nProdutos mais vendidos:\n${[...products].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 5).map(([name, quantity]) => `${name}: ${quantity} unidades`).join('\n') || 'Nenhum produto.'}`;
 }
-function fieldName(text: string): keyof ClientData | undefined { const c = normalize(text).replace(/^o |^a /, ''); return clientFields.find(([key, label]) => normalize(label) === c || normalize(key) === c || (key === 'observation' && c === 'observacao'))?.[0]; }
+function fieldName(text: string): keyof ClientData | undefined { const c = normalize(text).replace(/^o |^a /, ''); if (c === 'endereco') return 'street'; if (c === 'celular') return 'phone'; return clientFields.find(([key, label]) => normalize(label) === c || normalize(key) === c || (key === 'observation' && c === 'observacao'))?.[0]; }
 function fieldValue(key: keyof ClientData, text: string) {
   const value = /^(?:nao informar|sem|limpar|pular)$/i.test(normalize(text)) ? '' : text.trim();
   if (key === 'fullName' && (!value || value.length > 300)) throw new Error('Qual é o nome completo? Use até 300 caracteres.');
@@ -183,7 +210,7 @@ function valueForOperation(state: Extract<State, { type: 'record' }>, row: Sale 
 export function transition(current: State, input: string, snapshot: Snapshot): Reply {
   // Do not mutate React state or a confirmed request while interpreting a new reply.
   const state: State = structuredClone(current); const text = input.trim(); const clean = normalize(text);
-  const cancelled = clean === 'cancelar' || clean === 'cancela';
+  const cancelled = clean === 'cancelar' || clean === 'cancela' || clean === 'cancelar operacao';
   if (cancelled) {
     if (state.type === 'pendingFinancial' || state.type === 'pendingClient' || state.type === 'blocked' || (state.type === 'attachment' && state.attempted) || (state.type === 'restore' && state.attempted)) return answer(state, 'A confirmação já foi enviada. Precisamos verificar seu resultado antes de outra operação.', ['Verificar resultado']);
     return answer(idle, 'Cancelei. Nenhuma alteração foi enviada.');
@@ -203,10 +230,24 @@ export function transition(current: State, input: string, snapshot: Snapshot): R
       if (clean !== 'confirmar') return answer(state, 'Posso mudar essa preferência?', confirmChoices, `Tema ${state.dark ? 'escuro' : 'claro'}. O chat mantém as cores florais.`);
       return answer(idle, 'Preferência de tema atualizada. O Caderninho mantém as cores florais.', [], undefined, { type: 'theme', dark: state.dark });
     }
+    if (state.type === 'missingClient') {
+      if (/^(sim|sim, cadastrar|cadastrar)$/.test(clean)) {
+        const client: Extract<State, { type: 'client' }> = { type: 'client', data: { ...emptyClient(), fullName: state.query }, step: 'confirm', resume: state.selection.draft };
+        return answer(client, 'Vou conferir se esse cadastro já existe.', ['Cancelar'], undefined, { type: 'checkDuplicate', client });
+      }
+      if (clean === 'buscar novamente') return answer({ ...state.selection, candidates: [], query: '' }, 'Qual nome devo procurar?', ['Cancelar']);
+      return answer(state, 'Quer cadastrar, procurar outro nome ou cancelar?', ['Sim, cadastrar', 'Buscar novamente', 'Cancelar operação']);
+    }
     if (state.type === 'choose') {
+      if (snapshot.remoteSearch && clean === 'buscar novamente') return answer({ ...state, candidates: [], query: '', offset: 0 }, 'Qual nome devo procurar?', ['Cancelar']);
+      if (snapshot.remoteSearch && clean === 'mais resultados' && state.hasMore) return answer(state, 'Vou procurar mais opções…', ['Cancelar'], undefined, { type: 'searchClients', selection: state, query: state.query!, offset: (state.offset ?? 0) + 8 });
       const matching = state.candidates.filter(c => normalize(c.fullName) === clean);
       if (matching.length === 1) return choosePerson(state, matching[0], snapshot);
       const index = text.match(/^(?:cliente )?(\d+)(?:\.|$)/i); if (index && state.candidates[Number(index[1]) - 1]) return choosePerson(state, state.candidates[Number(index[1]) - 1], snapshot);
+      if (snapshot.remoteSearch) {
+        if (index) return answer(state, 'Esse número não está nas opções. Escolha uma das clientes acima.', state.candidates.map((c, i) => `${i + 1}. ${c.fullName}`).concat('Cancelar'));
+        return answer(state, 'Vou procurar esse nome…', ['Cancelar'], undefined, { type: 'searchClients', selection: state, query: text, offset: 0 });
+      }
       const match = findClients(text, state.candidates); if (match.exact && match.candidates.length === 1) return choosePerson(state, match.candidates[0], snapshot);
       return answer(state, 'Não consegui distinguir a cliente. Digite o nome completo ou o número da lista. Se não existe, cancele e diga “Cadastrar cliente”.', state.candidates.map((c, i) => `${i + 1}. ${c.fullName}`).concat('Cancelar'));
     }
@@ -225,10 +266,10 @@ export function transition(current: State, input: string, snapshot: Snapshot): R
         if (clean === 'corrigir') { if (state.deleting) return choose(snapshot, 'deleteClient', ''); return answer({ ...state, step: 'field' }, 'Qual informação devo corrigir? Diga nome, telefone, e-mail ou outro campo do cadastro.', ['Cancelar']); }
         if (clean !== 'confirmar') return clientReview(state);
         if (state.deleting && snapshot.sales.concat([]).some(s => s.clientId === state.original!.id) || state.deleting && snapshot.payments.some(p => p.clientId === state.original!.id)) return answer(idle, 'A cliente agora possui lançamentos. Exclusão bloqueada para preservar o histórico.');
-        const request: ClientRequest = { mode: state.deleting ? 'delete' : state.original ? 'edit' : 'create', data: state.data, id: state.original?.id, beforeIds: snapshot.clients.map(c => c.id) };
+        const request: ClientRequest = { mode: state.deleting ? 'delete' : state.original ? 'edit' : 'create', data: state.data, id: state.original?.id, beforeIds: snapshot.clients.map(c => c.id), resume: state.resume };
         return answer({ type: 'pendingClient', request }, 'Conferindo o cadastro…', [], undefined, { type: 'client', request });
       }
-      if (state.step === 'name') { state.data.fullName = fieldValue('fullName', text); if (snapshot.clients.some(c => normalize(c.fullName) === normalize(state.data.fullName))) return answer(state, 'Já existe uma cliente com esse nome. Informe um nome completo que permita distinguir as pessoas ou cancele para consultar o cadastro.', ['Cancelar']); return answer({ ...state, step: 'phone' }, 'Qual é o telefone com DDD? Se preferir, diga não informar.', ['Não informar', 'Cancelar']); }
+      if (state.step === 'name') { state.data.fullName = fieldValue('fullName', text); if (snapshot.remoteSearch) return answer({ ...state, step: 'confirm' }, 'Vou conferir esse nome…', ['Cancelar'], undefined, { type: 'checkDuplicate', client: { ...state, step: 'confirm' } }); if (snapshot.clients.some(c => normalize(c.fullName) === normalize(state.data.fullName))) return answer(state, 'Já existe uma cliente com esse nome. Informe um nome completo que permita distinguir as pessoas ou cancele para consultar o cadastro.', ['Cancelar']); return answer({ ...state, step: 'phone' }, 'Qual é o telefone com DDD? Se preferir, diga não informar.', ['Não informar', 'Cancelar']); }
       if (state.step === 'phone') { state.data.phone = fieldValue('phone', text); return answer({ ...state, step: 'details' }, 'Quer acrescentar endereço, e-mail ou observações? Diga qual informação, ou concluir cadastro.', ['Concluir cadastro', 'Cancelar']); }
       if ((state.step === 'details' || state.step === 'field') && /^(?:concluir|continuar|nao|pronto|revisar)/.test(clean)) return clientReview(state);
       if (state.step === 'field' || state.step === 'details') {
@@ -297,15 +338,21 @@ export function transition(current: State, input: string, snapshot: Snapshot): R
     }
     // New requests always start from the shared server snapshot, not invented records.
     if (/^(?:cadastrar|cadastre|cadastro|nova|novo|adicionar)\s+(?:uma?\s+)?cliente\b/.test(clean)) {
-      const name = text.replace(/^(?:cadastrar|cadastre|cadastro|nova|novo|adicionar)\s+(?:uma?\s+)?cliente\s*/i, '').trim();
+      const details = text.replace(/^(?:cadastrar|cadastre|cadastro|nova|novo|adicionar)\s+(?:uma?\s+)?cliente\s*(?:chamada\s+)?/i, '').trim();
+      const name = details.split(/[,;]|\s+(?:telefone|celular|email|e-mail|cpf|cep|rua|endere[çc]o|n[uú]mero|complemento|bairro|cidade|estado|observa[çc][aã]o)\s*[: ]/i)[0].trim().replace(/[.!]$/, '');
       const state: Extract<State, { type: 'client' }> = { type: 'client', data: emptyClient(), step: 'name' };
+      const phone = details.match(/(?:telefone|celular)\s*:?\s*([+\d()\s-]+)/i); if (phone) state.data.phone = fieldValue('phone', phone[1].trim());
+      const email = details.match(/(?:email|e-mail)\s*:?\s*([^\s,;]+@[^\s,;]+)/i); if (email) state.data.email = fieldValue('email', email[1]);
+      for (const provided of details.matchAll(/[,;]\s*(telefone|celular|email|e-mail|cpf|cep|rua|endere[çc]o|n[uú]mero|complemento|bairro|cidade|estado|observa[çc][aã]o)\s*:?\s*([^,;]*)/gi)) {
+        const field = fieldName(provided[1]); if (field) state.data[field] = fieldValue(field, provided[2]);
+      }
       return name ? transition(state, name, snapshot) : answer(state, 'Qual é o nome completo da cliente?', ['Cancelar']);
     }
     if (/^(?:alterar|editar|corrigir|excluir|apagar|remover)\s+(?:a\s+)?cliente\b/.test(clean)) return choose(snapshot, /excluir|apagar|remover/.test(clean) ? 'deleteClient' : 'editClient', text.replace(/^(?:alterar|editar|corrigir|excluir|apagar|remover)\s+(?:a\s+)?cliente\s*/i, ''));
     if (/^(?:alterar|editar|corrigir|excluir|apagar|remover)\s+(?:a\s+|o\s+)?(?:venda|pagamento|recebimento)\b/.test(clean)) {
       const deleting = /^(?:excluir|apagar|remover)/.test(clean); const sale = /\bvenda\b/.test(clean); return choose(snapshot, `${deleting ? 'delete' : 'edit'}${sale ? 'Sale' : 'Payment'}` as Extract<State, { type: 'choose' }>['purpose'], text.replace(/^(?:alterar|editar|corrigir|excluir|apagar|remover)\s+(?:a\s+|o\s+)?(?:venda|pagamento|recebimento)\s*/i, '').replace(/^(?:da|do|de)\s+/i, ''));
     }
-    if (/^(?:clientes|listar clientes|minhas clientes|quem sao as clientes)$/.test(clean)) return answer(idle, `Clientes cadastradas:\n${snapshot.clients.map(c => c.fullName).join('\n') || 'Nenhuma cliente.'}\nPara consultar um cadastro, diga “Consultar cliente” e o nome.`);
+    if (/^(?:clientes|listar clientes|minhas clientes|quem sao as clientes)$/.test(clean)) return snapshot.remoteSearch ? choose(snapshot, 'client', '') : answer(idle, `Clientes cadastradas:\n${snapshot.clients.map(c => c.fullName).join('\n') || 'Nenhuma cliente.'}\nPara consultar um cadastro, diga “Consultar cliente” e o nome.`);
     if (/^(?:consultar|ver|mostrar|mostra|dados|cadastro)\s+(?:(?:da|de|a)\s+)?cliente\b/.test(clean)) return choose(snapshot, 'client', text.replace(/^(?:consultar|ver|mostrar|mostra|dados|cadastro)\s+(?:(?:da|de|a)\s+)?cliente\s*/i, ''));
     if (/relatorio|quem mais compr|produtos mais vendidos/.test(clean)) { const range = period(text); return range ? answer(idle, report(snapshot, range)) : answer({ type: 'period', query: 'reports' }, 'De qual período quer o relatório?', ['Hoje', 'Este mês', 'Todo o histórico', 'Cancelar']); }
     if (/historico/.test(clean)) {
@@ -322,12 +369,12 @@ export function transition(current: State, input: string, snapshot: Snapshot): R
     if (/^(?:recebimento|pagamento|receber)$/.test(clean)) return readyFinance({ kind: 'payment', value: { kind: 'payment', candidates: [], items: [], date: today(), observation: '', installments: false } }, snapshot);
     const parsed = interpret(text, snapshot.clients);
     if (parsed.kind === 'sale') {
-      const draft = parseChatSale(text, snapshot.clients); const reply = readyFinance(draft, snapshot);
+      const draft = parseChatSale(text, snapshot.clients); if (snapshot.remoteSearch) draft.value.clientId = undefined; const reply = readyFinance(draft, snapshot);
       if (draft.value.installments) reply.text = 'Registro somente venda, recebimento e saldo; parcelas e vencimentos formais não existem ainda.\n' + reply.text;
       return reply;
     }
-    if (parsed.kind === 'payment') return readyFinance({ kind: 'payment', value: parsed }, snapshot);
-    if (parsed.kind === 'pending') { const people = snapshot.clients.map(c => ({ name: c.fullName, total: clientBalance(snapshot.sales, snapshot.payments, c.id) })).filter(c => c.total > 0); return answer(idle, people.length ? `Quem está devendo\n${people.map(c => `${c.name}: ${currency(c.total)}`).join('\n')}\nTotal pendente: ${currency(sumCents(people.map(c => c.total)))}` : 'Nenhuma cliente tem saldo pendente.'); }
+    if (parsed.kind === 'payment') { if (snapshot.remoteSearch) parsed.clientId = undefined; return readyFinance({ kind: 'payment', value: parsed }, snapshot); }
+    if (parsed.kind === 'pending') { const people = ledgerPeople(snapshot).map(c => ({ name: c.fullName, total: clientBalance(snapshot.sales, snapshot.payments, c.id) })).filter(c => c.total > 0); return answer(idle, people.length ? `Quem está devendo\n${people.map(c => `${c.name}: ${currency(c.total)}`).join('\n')}\nTotal pendente: ${currency(sumCents(people.map(c => c.total)))}` : 'Nenhuma cliente tem saldo pendente.'); }
     if (parsed.kind === 'balance' || parsed.kind === 'statement') return choose(snapshot, parsed.kind, text);
     if (parsed.kind === 'received') {
       if (parsed.filterClient && !parsed.clientId) return choose(snapshot, 'received', text);

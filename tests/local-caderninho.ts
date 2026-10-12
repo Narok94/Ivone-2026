@@ -45,7 +45,7 @@ try {
   assert.equal(await page.locator('nav, .chat-feed input, .chat-feed select, .chat-feed textarea').count(), 0);
   await page.getByText(/Teste local · dados fictícios/).waitFor();
   const wait = () => page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled'));
-  const say = async (text: string) => { await wait(); await page.getByLabel('Mensagem', { exact: true }).fill(text); await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click(); await wait(); };
+  const say = async (text: string) => { await wait(); await page.getByLabel('Mensagem', { exact: true }).fill(text); await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click(); await wait(); const choices = page.locator('.chat-client-options button').filter({ hasText: /^\d+\. / }); if (await choices.count() === 1) { await choices.click(); await wait(); } };
   const counts = async () => (await pool.query('SELECT (SELECT count(*)::int FROM vendas) AS sales,(SELECT count(*)::int FROM pagamentos) AS payments')).rows[0];
   await wait();
   assert.equal((await context.request.post(base + '/api/clients', { data: { fullName: 'Sem CSRF' }, headers: { Origin: base } })).status(), 403);

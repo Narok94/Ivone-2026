@@ -28,8 +28,13 @@ async function login(page: Page) {
   await page.getByPlaceholder('PIN de 4 números').fill(pin);
   await page.getByRole('button', { name: /Acessar Caderninho/ }).click();
 }
-async function say(page: Page, text: string) { await page.getByRole('textbox', { name: 'Mensagem', exact: true }).fill(text); await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click(); }
-async function chooseJessica(page: Page) { await page.getByRole('button', { name: 'Jessica', exact: true }).click(); }
+async function say(page: Page, text: string) {
+  await page.getByRole('textbox', { name: 'Mensagem', exact: true }).fill(text); await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click(); await waitReady(page);
+  // Explicitly choose the sole suggestion in the test; production never chooses it.
+  const candidates = page.locator('.chat-client-options button').filter({ hasText: /^\d+\. / });
+  if (await candidates.count() === 1) { await candidates.click(); await waitReady(page); }
+}
+async function chooseJessica(page: Page) { await page.getByRole('button', { name: /^\d+\. Jessica$/, exact: true }).click(); await waitReady(page); }
 async function waitReady(page: Page) { await page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled') && !document.querySelector('.chat-conversation-options button:disabled')); }
 async function layout(page: Page) {
   const result = await page.evaluate(() => {
@@ -49,7 +54,7 @@ async function mobile(context: BrowserContext, width: number, height: number, fu
   assert.equal(await page.locator('nav, .chat-tools, .chat-editor, .chat-shortcuts, .chat-feed input, .chat-feed select, .chat-feed textarea, .chat-feed fieldset').count(), 0); assert.equal(await page.locator('form').count(), 1); assert.equal(await page.getByRole('link', { name: 'Gestão completa' }).count(), 0);
   await page.screenshot({ path: `${output}/mobile-${width}x${height}.png` });
   if (full) {
-    await say(page, 'Cadastrar cliente'); await say(page, 'Cliente Ficticia'); await say(page, 'Não informar'); await say(page, 'e-mail'); await say(page, 'ficticia@example.test'); await say(page, 'Concluir cadastro'); await waitReady(page); assert.equal(clientWrites, 0);
+    await say(page, 'Cadastrar cliente'); await say(page, 'Cliente Ficticia'); await say(page, 'Corrigir'); await say(page, 'e-mail'); await say(page, 'ficticia@example.test'); await say(page, 'Concluir cadastro'); await waitReady(page); assert.equal(clientWrites, 0);
     await say(page, 'Cancelar'); assert.equal(clientWrites, 0);
     await say(page, 'Cadastrar cliente Cliente Ficticia'); await say(page, 'Não informar'); await say(page, 'Concluir cadastro'); await page.getByRole('button', { name: 'Confirmar', exact: true }).dblclick(); await waitReady(page); assert.equal(clientWrites, 1); assert.match(await page.locator('.chat-bubble p').last().innerText(), /Cadastro de Cliente Ficticia salvo/);
     await say(page, 'Editar cliente Cliente Ficticia'); await say(page, 'telefone'); await say(page, '11999990000'); await say(page, 'Concluir cadastro'); await waitReady(page); assert.equal(clientWrites, 1); await say(page, 'Confirmar'); await waitReady(page); assert.equal(clientWrites, 2);
@@ -107,4 +112,19 @@ try {
   await page.goto(base); await page.getByTitle('Configurações', { exact: true }).click(); const downloadEvent = page.waitForEvent('download'); await page.getByText('Realizar Backup', { exact: true }).click(); const download = await downloadEvent; await download.saveAs(`${output}/backup-fixture.json`);
   await page.screenshot({ path: `${output}/desktop.png` }); await page.goto(base + '/?modo=gestao'); await page.setViewportSize({ width: 393, height: 852 }); await page.reload(); await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor(); assert.equal(await page.locator('nav').count(), 0); assert.equal(await page.getByRole('link', { name: 'Gestão completa' }).count(), 0);
   assert.deepEqual(errors, []); console.log('PASS desktop: multi-item atomic sale, explicit cancel, partial receipt, exact cents, stale edit/client regression, clients/reports/history/settings/backup and shared mobile data'); await context.close();
+  await pool.reset();
+  await pool.query("INSERT INTO clientes(full_name) SELECT 'Pessoa Teste '||lpad(i::text,5,'0') FROM generate_series(1,5000) i");
+  await pool.query('VACUUM ANALYZE clientes');
+  const largeContext = await browser.newContext({ viewport: { width: 393, height: 852 } }); const largePage = await largeContext.newPage();
+  const loadedClients: number[] = [];
+  largePage.on('response', async r => { if (r.url().includes('/api/operations') && r.request().method() === 'GET') { const body = await r.json(); loadedClients.push(body.clients.length); } });
+  await largePage.goto(base); await login(largePage); await largePage.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor(); await waitReady(largePage);
+  await say(largePage, 'Consultar cliente Pessoa Teste'); assert.equal(await largePage.locator('.chat-client-options button').filter({ hasText: /^\d+\. / }).count(), 8); const firstChoice = await largePage.locator('.chat-client-options button').first().innerText(); await say(largePage, 'Mais resultados'); assert.notEqual(await largePage.locator('.chat-client-options button').first().innerText(), firstChoice); await say(largePage, 'Cancelar');
+  await say(largePage, 'Vendi um Egeo Black para Bruna Costa'); await largePage.getByRole('button', { name: 'Sim, cadastrar', exact: true }).waitFor(); assert.equal(await largePage.locator('.chat-client-options button').filter({ hasText: /^\d+\. / }).count(), 0); await say(largePage, 'Cancelar operação'); assert.equal((await pool.query("SELECT count(*)::int AS n FROM clientes WHERE full_name='Bruna Costa'")).rows[0].n, 0);
+  await say(largePage, 'Vendi um Egeo Black para Bruna Costa'); await say(largePage, 'Sim'); await say(largePage, 'Confirmar'); await waitReady(largePage); assert.match(await largePage.locator('.chat-bubble p').last().innerText(), /valor por unidade de Egeo Black/); assert.deepEqual(await counts(), { sales: 0, payments: 0, operations: 0 });
+  await say(largePage, '150'); await say(largePage, 'Ainda não pagou'); assert.match(await largePage.locator('.chat-summary-text').last().innerText(), /Bruna Costa/); assert.match(await largePage.locator('.chat-summary-text').last().innerText(), /1 Egeo Black/); assert.deepEqual(await counts(), { sales: 0, payments: 0, operations: 0 }); await say(largePage, 'Confirmar'); assert.deepEqual(await counts(), { sales: 1, payments: 0, operations: 1 });
+  const savedClient = (await pool.query("SELECT id FROM clientes WHERE full_name='Bruna Costa'")).rows[0].id; assert.equal((await pool.query('SELECT client_id FROM vendas')).rows[0].client_id, savedClient);
+  assert(loadedClients.length > 0); assert(loadedClients.every(n => n <= 100)); assert.equal(loadedClients[0], 0);
+  await say(largePage, 'Cadastrar cliente Bruna Costa'); assert.match(await largePage.locator('.chat-bubble p').last().innerText(), /Já existe/); await say(largePage, 'Cancelar');
+  await largeContext.close(); console.log('PASS 5,000-client mobile browser: bounded initial catalogue, eight-option pagination, missing-client cancellation, confirmed signup, preserved sale continuation, separate sale confirmation and correct client ID');
 } finally { await browser.close(); await new Promise<void>(resolve => server.close(() => resolve())); await pool.end(); }

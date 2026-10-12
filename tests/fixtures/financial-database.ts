@@ -1,8 +1,9 @@
 // Isolated PostgreSQL engine in memory. Never imports Neon, dotenv or api/db.
 import { PGlite } from '@electric-sql/pglite';
+import { pg_trgm } from '@electric-sql/pglite/contrib/pg_trgm';
 import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
-export const db = new PGlite();
+export const db = new PGlite({ extensions: { pg_trgm } });
 export const pin = String(randomBytes(4).readUInt32BE() % 10000).padStart(4, '0');
 export const clientIds = ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000003'];
 const ready = (async () => {
@@ -11,6 +12,7 @@ const ready = (async () => {
     CREATE TABLE pagamentos (id uuid PRIMARY KEY DEFAULT gen_random_uuid(),client_id uuid REFERENCES clientes(id) ON DELETE CASCADE,payment_date date,amount numeric NOT NULL,observation text);
     CREATE TABLE usuarios (id integer PRIMARY KEY,username text,pin text NOT NULL);`);
   await db.exec(readFileSync(new URL('../../db/001_financial_operations.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../../db/003_client_search.sql', import.meta.url), 'utf8'));
   await db.query('INSERT INTO usuarios VALUES ($1,$2,$3)', [99, 'Ivone', pin]);
   for (const [i, name] of ['Jessica', 'Maria', 'Jessica Silva'].entries()) await db.query('INSERT INTO clientes (id,full_name) VALUES ($1,$2)', [clientIds[i], name]);
 })();

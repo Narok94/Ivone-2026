@@ -5,7 +5,8 @@ import { useData } from '../../contexto/DataContext';
 import { apiFetch, ApiError } from '../../lib/api';
 import { readPending } from '../../lib/pending-operation';
 import { clientBalance, currency, type FinancialOperation } from '../../lib/finance';
-import { clientFields, transition, type Action, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
+import { clientFields, clientSummary, searchReply, resumeClient, transition, type Action, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
+import { normalize } from '../../lib/conversation';
 
 type Message = { id: number; text: string; own?: boolean; summary?: string };
 export default function MobileCaderninho() {
@@ -29,7 +30,11 @@ export default function MobileCaderninho() {
   const [messages, setMessages] = useState<Message[]>([{ id: 0, text: reply.text }]);
   const [input, setInput] = useState(''); const [working, setWorking] = useState(false);
   const busy = useRef(false); const sequence = useRef(1); const attachment = useRef<HTMLInputElement>(null);
-  const snapshot = (): Snapshot => ({ clients: data.clients, sales: data.sales, payments: data.payments });
+  const snapshot = (): Snapshot => ({ clients: data.clients, sales: data.sales, payments: data.payments, remoteSearch: true });
+  async function search(query: string, offset = 0) {
+    const result = await (await apiFetch(`/api/clients?q=${encodeURIComponent(query)}&offset=${offset}`)).json();
+    data.rememberClients(result.clients); return result;
+  }
   const append = (text: string, own = false, summary?: string) => setMessages(old => [...old, { id: sequence.current++, text, own, summary }]);
   function apply(next: Reply) { current.current = next; setReply(next); if (next.text) append(next.text, false, next.summary); }
   const response = (state: State, text: string, choices: string[] = []): Reply => ({ state, text, choices });
@@ -41,17 +46,30 @@ export default function MobileCaderninho() {
     const link = document.createElement('a'); link.href = url; link.download = 'backup_ivone.json'; link.click(); URL.revokeObjectURL(url); return result.fingerprint as string;
   }
   async function checkClient(request: ClientRequest): Promise<Reply> {
+    if (request.mode === 'create') await search(request.data.fullName);
     const fresh = await refreshData();
     const equal = (person: typeof fresh.clients[number]) => clientFields.every(([field]) => (person[field] ?? '') === (request.data[field] ?? '').trim());
     const found = request.mode === 'create' ? fresh.clients.filter(c => !request.beforeIds.includes(c.id) && equal(c)) : fresh.clients.filter(c => c.id === request.id && equal(c));
     const deleted = request.mode === 'delete' && !fresh.clients.some(c => c.id === request.id);
     if (found.length === 1 || deleted) {
       sessionStorage.removeItem(clientKey);
-      return response({ type: 'idle' }, `Verifiquei o resultado sem repetir a gravação. ${deleted ? 'Cliente excluída, sem lançamentos.' : `Cadastro de ${found[0].fullName} salvo.\n${balanceLabel(fresh, found[0].id)}`}`);
+      if (deleted) return response({ type: 'idle' }, 'Cliente excluída, sem lançamentos.');
+      const next = resumeClient(request, found[0], { ...fresh, remoteSearch: true });
+      return { ...next, text: `Verifiquei o resultado sem repetir a gravação. ${next.text}` };
     }
     return response({ type: 'pendingClient', request }, 'Ainda não consegui comprovar essa confirmação. Não vou reenviar o cadastro para evitar duplicação. Consulte novamente; se persistir, será necessária verificação pelo responsável.', ['Verificar resultado']);
   }
   async function execute(action: Action, before: State) {
+    if (action.type === 'searchClients') { apply(searchReply(action.selection, await search(action.query, action.offset))); return; }
+    if (action.type === 'checkDuplicate') {
+      const result = await search(action.client.data.fullName);
+      const exact = result.clients.filter((c: any) => normalize(c.fullName) === normalize(action.client.data.fullName));
+      if (exact.length) {
+        if (action.client.resume) apply(searchReply({ type: 'choose', purpose: 'finance', candidates: [], draft: action.client.resume }, { ...result, clients: exact, hasMore: false }));
+        else apply(response({ ...action.client, step: 'name' }, 'Já existe uma cliente com esse nome. Não criei outro cadastro. Informe um nome completo diferente ou cancele para consultar.', ['Cancelar']));
+      } else apply({ state: action.client, text: result.clients.length ? `Encontrei nomes parecidos: ${result.clients.map((c: any) => c.fullName).join(', ')}. Confira se é outra pessoa. Só salvo após Confirmar. Para acrescentar informações, diga Corrigir.` : 'Confira o cadastro. Só salvo após Confirmar. Para acrescentar informações, diga Corrigir.', choices: ['Confirmar', 'Corrigir', 'Cancelar'], summary: clientSummary(action.client.data) });
+      return;
+    }
     if (action.type === 'financial' || action.type === 'retryFinancial') {
       const draft = action.type === 'financial' ? action.draft : null;
       const operation: FinancialOperation = action.type === 'retryFinancial' ? action.operation : { operationId: crypto.randomUUID(), confirmed: true, kind: draft!.kind, targetId: draft!.targetId, clientId: draft!.value.clientId!, date: draft!.value.date, observation: draft!.value.observation, items: draft!.value.items.map(i => ({ ...i, unitCents: i.unitCents! })), receivedCents: draft!.received ?? 0, amountCents: draft!.value.amountCents, allowCredit: draft!.allowCredit };
@@ -66,6 +84,7 @@ export default function MobileCaderninho() {
       return;
     }
     if (action.type === 'client') {
+      if (action.request.mode === 'create') await search(action.request.data.fullName);
       const fresh = await refreshData(); const request = action.request; const person = fresh.clients.find(c => c.id === request.id);
       if (request.mode !== 'create' && !person) throw new Error('Essa cliente não existe mais. Cancele e consulte novamente.');
       if (request.mode === 'create' && fresh.clients.some(c => c.fullName.trim().toLocaleLowerCase('pt-BR') === request.data.fullName.trim().toLocaleLowerCase('pt-BR'))) throw new Error('Esse nome já existe. Cancele e consulte o cadastro antes de criar outra cliente.');
@@ -75,7 +94,7 @@ export default function MobileCaderninho() {
       request.beforeIds = fresh.clients.map(c => c.id); sessionStorage.setItem(clientKey, JSON.stringify(request));
       apply(response({ type: 'pendingClient', request }, 'Enviando a confirmação do cadastro…'));
       try {
-        if (request.mode === 'create') await data.addClient(request.data);
+        if (request.mode === 'create') { const saved = await (await apiFetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...request.data, conversational: true, confirmed: true }) })).json(); data.rememberClients([saved]); }
         else if (request.mode === 'edit') await data.updateClient({ ...request.data, id: request.id! });
         else await apiFetch(`/api/clients?id=${request.id}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmed: true, preserveHistory: true }) });
         apply(await checkClient(request));
@@ -104,7 +123,7 @@ export default function MobileCaderninho() {
     if (!text.trim() || busy.current) return;
     if (text === 'Anexar backup') { attachment.current?.click(); return; }
     busy.current = true; setWorking(true); setInput(''); append(text, true); const before = current.current.state;
-    try { const fresh = await refreshData(); const next = transition(before, text, fresh); apply(next); if (next.action) await execute(next.action, before); }
+    try { const fresh = await refreshData(); const next = transition(before, text, { ...fresh, remoteSearch: true }); apply(next); if (next.action) await execute(next.action, before); }
     catch (e: any) { apply(response(before, e.message || 'Não consegui atualizar. Nenhuma nova confirmação foi enviada.', current.current.choices)); }
     finally { busy.current = false; setWorking(false); }
   }

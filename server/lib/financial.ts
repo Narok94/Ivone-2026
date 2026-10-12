@@ -41,14 +41,14 @@ export async function withFinancialLock<T>(pool: any, work: (db: any) => Promise
   finally { db.release(discard ? new Error('Transaction failed') : undefined); }
 }
 export const clientRow = (r: any) => ({ id: r.id, fullName: r.full_name, phone: r.phone ?? '', email: r.email ?? '', street: r.street ?? '', neighborhood: r.neighborhood ?? '', city: r.city ?? '', state: r.state ?? '', cep: r.cep ?? '', number: r.number ?? '', complement: r.complement ?? '', cpf: r.cpf ?? '', observation: r.observation ?? '' });
-export async function readFinancialSnapshot(pool: any) {
+export async function readFinancialSnapshot(pool: any, clientIds?: string[]) {
   const db = await pool.connect();
   let discard = false;
   try {
     await db.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
-    const clients = (await db.query('SELECT * FROM clientes ORDER BY full_name, id')).rows.map(clientRow);
-    const sales = (await db.query('SELECT *,sale_date::text AS sale_date FROM vendas ORDER BY vendas.sale_date DESC,vendas.id')).rows.map(saleRow);
-    const payments = (await db.query('SELECT *,payment_date::text AS payment_date FROM pagamentos ORDER BY pagamentos.payment_date DESC,pagamentos.id')).rows.map(paymentRow);
+    const clients = (await db.query(clientIds ? 'SELECT * FROM clientes WHERE id=ANY($1::uuid[]) ORDER BY full_name,id' : 'SELECT * FROM clientes ORDER BY full_name, id', clientIds ? [clientIds] : undefined)).rows.map(clientRow);
+    const sales = (await db.query(clientIds ? 'SELECT v.*,v.sale_date::text AS sale_date,c.full_name AS client_name FROM vendas v JOIN clientes c ON c.id=v.client_id ORDER BY v.sale_date DESC,v.id' : 'SELECT *,sale_date::text AS sale_date FROM vendas ORDER BY vendas.sale_date DESC,vendas.id')).rows.map((r: any) => ({ ...saleRow(r), ...(clientIds ? { clientName: r.client_name } : {}) }));
+    const payments = (await db.query(clientIds ? 'SELECT p.*,p.payment_date::text AS payment_date,c.full_name AS client_name FROM pagamentos p JOIN clientes c ON c.id=p.client_id ORDER BY p.payment_date DESC,p.id' : 'SELECT *,payment_date::text AS payment_date FROM pagamentos ORDER BY pagamentos.payment_date DESC,pagamentos.id')).rows.map((r: any) => ({ ...paymentRow(r), ...(clientIds ? { clientName: r.client_name } : {}) }));
     await db.query('COMMIT'); return { clients, sales, payments };
   } catch (error) { discard = true; try { await db.query('ROLLBACK'); } catch {} throw error; }
   finally { db.release(discard ? new Error('Transaction failed') : undefined); }

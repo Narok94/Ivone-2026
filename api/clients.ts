@@ -1,10 +1,13 @@
 import { requireSession } from '../server/lib/session.js';
 import { clientRow, FinancialError, withFinancialLock } from '../server/lib/financial.js';
 import { pool } from './db.js';
+import { searchClients } from '../server/lib/client-search.js';
 export default async function handler(req: any, res: any) {
   if (!await requireSession(req, res)) return;
   const id = req.query.id ?? req.params?.id;
   try {
+    if (req.method === 'GET' && req.query.q !== undefined) return res.json(await searchClients(pool, req.query.q, req.query.offset ?? 0));
+    if (req.method === 'GET' && id) return res.json((await pool.query('SELECT * FROM clientes WHERE id=$1', [id])).rows.map(clientRow));
     if (req.method === 'GET') return res.json((await pool.query('SELECT * FROM clientes ORDER BY full_name,id')).rows.map(clientRow));
     if (!['POST', 'PUT', 'DELETE'].includes(req.method)) return res.status(405).json({ message: 'Método não permitido.' });
     if (req.method !== 'POST' && (typeof id !== 'string' || !/^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i.test(id))) throw new FinancialError('Cliente inválida.');
@@ -12,6 +15,11 @@ export default async function handler(req: any, res: any) {
     if (req.method === 'DELETE' && c?.confirmed !== true) throw new FinancialError('Confirme a exclusão da cliente e de seus registros relacionados.');
     if (req.method !== 'DELETE' && (typeof c?.fullName !== 'string' || !c.fullName.trim() || c.fullName.length > 300)) throw new FinancialError('Informe o nome da cliente.');
     const result = await withFinancialLock(pool, async db => {
+      if (req.method === 'POST' && c.conversational === true) {
+        if (c.confirmed !== true) throw new FinancialError('Confirme o cadastro antes de salvar.');
+        const duplicate = (await db.query('SELECT id FROM clientes WHERE public.ivone_client_name(full_name)=public.ivone_client_name($1) LIMIT 1', [c.fullName])).rows[0];
+        if (duplicate) throw new FinancialError('Já existe uma cliente com esse nome. Consulte o cadastro antes de criar outra.', 409);
+      }
       if (req.method === 'DELETE') {
         // Conversational deletions must never cascade into financial history.
         // Check under the same lock as financial operations, not only in the UI.

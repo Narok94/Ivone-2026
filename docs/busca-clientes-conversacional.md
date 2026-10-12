@@ -1,0 +1,15 @@
+# Busca de clientes e continuidade da venda
+
+A conversa usa `GET /api/clients?q=nome&offset=0`, autenticado, com oito opções por página e botão Mais resultados. Acentos, maiúsculas, nomes parciais e pequenas diferenças de digitação são tratados pelo PostgreSQL. Sugestões nunca escolhem uma pessoa automaticamente: a usuária deve clicar na opção ou escrever seu número/nome completo. Nomes completos duplicados exigem escolha numerada, com telefone e referência curta para distinguir os registros.
+
+O SQL aditivo `db/003_client_search.sql` cria `pg_trgm`, uma função imutável de normalização e índices GIN/B-tree. Nenhuma linha existente é alterada. Entradas de duas letras usam prefixo indexado; entradas maiores usam substring e semelhança por palavras. Páginas limitadas, parâmetros SQL e timeout de consulta impedem listagens irrestritas. O prebuild de produção exige os índices válidos.
+
+No mobile, `/api/operations?mode=chat&ids=...` traz somente até 100 cadastros já consultados, com zero cadastros no carregamento inicial. A busca não baixa a lista inteira. Nomes nos lançamentos mantêm extratos, relatórios e saldos corretos sem carregar todos os cadastros. A gestão desktop conserva seu contrato existente. Autenticação, CSRF, cookies e o modelo de acesso da caderneta existente foram preservados; nenhum tenant, usuário, permissão ou serviço externo foi criado.
+
+Quando não existe a cliente, a conversa oferece cadastrar, buscar novamente ou cancelar. O rascunho da venda permanece no estado e acompanha qualquer confirmação de cadastro com resposta pendente. Cadastro direto reconhece nome e informações fornecidas; somente nome é obrigatório. Campos opcionais podem ser acrescentados por Corrigir. Nenhum telefone/endereço é inventado.
+
+Antes de salvar, a conversa consulta possíveis duplicados e mostra resumo para confirmação explícita. A API bloqueia duplicados exatos normalizados dentro do lock já utilizado pelo aplicativo, inclusive em concorrência. Respostas perdidas são verificadas por consulta, sem repetir a criação. Após salvar, a venda retoma produto, quantidade, preço, entrada, restante, data e observações. Somente informações faltantes são perguntadas; a venda exige sua própria confirmação e conserva a idempotência financeira.
+
+Validação isolada: cenários A–O; 5.000 cadastros fictícios; páginas sem repetição; planos PostgreSQL comprovando uso dos índices; API sem sessão/sem CSRF; cadastro duplicado/sem confirmação; cancelamentos; continuidade de venda e cliente correto; jornadas mobile e desktop existentes. Nenhuma operação financeira de teste é enviada ao Neon real.
+
+Ativação em 12/10/2026: backup atualizado fora do Git em `../Ivone-2026-backups/2026-10-12-client-search`, recuperação integral verificada em PGlite isolado com UTC, incluindo precisão dos timestamps, schema, índices, sequências e hashes. SQL 003 aplicado após conferir projeto `Ivone`, branch `main`, banco `neondb` e ausência de conflitos. Comparação integral confirmou preservação de clientes, usuários, vendas, pagamentos e recibos financeiros; gate de produção aprovado por leitura.

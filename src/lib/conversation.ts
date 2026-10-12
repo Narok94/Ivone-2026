@@ -4,7 +4,7 @@ import { brCents, FinancialItem, lineTotal, today, validDate } from './finance';
 export const normalize = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 type Intent = 'sale' | 'payment' | 'balance' | 'statement' | 'pending' | 'received' | 'unknown';
 export type ParsedItem = Omit<FinancialItem, 'unitCents'> & { unitCents: number | null; priceQuestion?: number };
-export type Interpretation = { kind: Intent; candidates: Client[]; clientId?: string; items: ParsedItem[]; amountCents?: number; date: string; observation: string; question?: string; period?: 'all' | 'today' | 'month'; installments: boolean; needsReview?: boolean; filterClient?: boolean };
+export type Interpretation = { kind: Intent; candidates: Client[]; clientId?: string; clientQuery?: string; items: ParsedItem[]; amountCents?: number; date: string; observation: string; question?: string; period?: 'all' | 'today' | 'month'; installments: boolean; needsReview?: boolean; filterClient?: boolean };
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 function mentions(text: string, name: string) { return new RegExp(`(?:^|[^a-z0-9])${escaped(name)}(?=$|[^a-z0-9])`, 'i').test(text); }
 function distance(a: string, b: string) {
@@ -26,7 +26,7 @@ export function findClients(text: string, clients: Client[], prefix = false) {
 const quantities: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10 };
 const numberPattern = '(?:\\d{1,3}(?:\\.\\d{3})+(?:,\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?)';
 const saleCommand = /^\s*(?:venda|vendi|vender|vda|vnd)\s+/i;
-const recipientPattern = /\b(?:para|pra|p\/)\s+(.+?)(?=\s+(?:por|a|de|dia|em|obs|R\$|\d)\b|$)/i;
+const recipientPattern = /\b(?:para|pra|p\/)\s+(.+?)(?=\s+(?:(?:por|a|de)\s+(?:R\$|\d)|(?:dia|em)\s+\d|obs\b|R\$|\d)|$)/i;
 function buyerContext(text: string, clients: Client[]) {
   const sentence = text.match(/^(.+?)\s+(?:comprou|levou)\s+/i);
   if (sentence) return { source: sentence[1], prefix: false, mode: 'sentence' };
@@ -34,7 +34,7 @@ function buyerContext(text: string, clients: Client[]) {
   const recipient = text.match(recipientPattern);
   if (command) {
     const tail = text.slice(command[0].length);
-    if (/^vendi/i.test(command[0]) && recipient && !findClients(tail, clients, true).candidates.length) return { source: recipient[1], prefix: true, mode: 'recipient' };
+    if (recipient) return { source: recipient[1].replace(/[.!]$/, '').trim(), prefix: true, mode: 'recipient' };
     return { source: tail, prefix: true, mode: 'prefix' };
   }
   return { source: text, prefix: false, mode: 'unknown' };
@@ -78,6 +78,8 @@ export function interpret(text: string, clients: Client[], now = new Date()): In
   const buyer = kind === 'sale' ? buyerContext(original, clients) : { source: kind === 'payment' ? original.split(/\bpagou\b/i)[0] : original, prefix: false, mode: 'other' };
   const match = findClients(buyer.source, clients, buyer.prefix);
   const result: Interpretation = { kind, candidates: match.candidates, clientId: match.exact && match.candidates.length === 1 ? match.candidates[0].id : undefined, items: [], date: today(now), observation: '', installments: /parcel|vezes|\b\d+\s*x\s*\d/.test(clean) };
+  if (kind === 'sale') result.clientQuery = buyer.mode === 'prefix' ? buyer.source.split(/\s/)[0] : buyer.mode === 'unknown' ? undefined : buyer.source;
+  if (kind === 'payment') result.clientQuery = original.match(/^(.+?)\s+pagou\b/i)?.[1] ?? original.match(/(?:para|pra|de|da)\s+(.+?)(?=\s+\d|$)/i)?.[1];
   if (kind === 'unknown') { result.question = 'Conte o que aconteceu: quem comprou, qual produto e por quanto? Também posso consultar extratos e pendências.'; return result; }
   if (kind === 'received') {
     result.period = /hoje/.test(clean) ? 'today' : /(?:este|esse|neste|nesse) mes/.test(clean) ? 'month' : 'all';
@@ -110,7 +112,7 @@ export function interpret(text: string, clients: Client[], now = new Date()): In
   else if (buyer.mode === 'prefix') { original = original.replace(saleCommand, ''); original = original.slice(buyerLength(original, match.candidates)).trim().replace(/^[:,]\s*/, ''); if (!match.candidates.length) result.needsReview = true; }
   else if (buyer.mode === 'recipient') {
     original = original.replace(saleCommand, ''); const recipient = original.match(recipientPattern);
-    if (recipient) { const end = recipient.index! + recipient[0].indexOf(recipient[1]) + buyerLength(recipient[1], match.candidates); original = original.slice(0, recipient.index) + original.slice(end); }
+    if (recipient) { const end = recipient.index! + recipient[0].length; original = original.slice(0, recipient.index) + original.slice(end); }
   } else { original = ''; result.needsReview = true; }
   original = original.replace(/\s+(?:e\s+)?(?:ja\s+|já\s+)?pagou(?:\s+tudo)?\s*$/i, '').trim();
   const possible = original.split(/\s+e\s+/i).map(itemFrom);
