@@ -15,5 +15,13 @@
 @media(max-height:550px){.chat-header{padding-top:calc(7px + env(safe-area-inset-top));padding-bottom:7px}.chat-avatar{height:36px;width:36px}.chat-demo .chat-heading h1{font-size:23px}.chat-demo-label{padding-top:2px;padding-bottom:2px}.chat-footer-note{display:none}.chat-footer{padding-top:6px}}
 .chat-session-actions{display:flex;gap:12px;align-items:center}.chat-session-actions button{border:0;background:transparent;min-height:32px;color:#845365;font-size:11px;cursor:pointer}.chat-client-options{display:flex;flex-direction:column;gap:8px}.chat-client-options button{border:1px solid #dec8bd;background:#fff4ef;color:#84675e;padding:8px 12px;min-height:44px;overflow-wrap:anywhere}.chat-official .chat-bubble button{min-height:44px;border:1px solid #dec8bd;background:#fff4ef;padding:8px 12px;border-radius:10px;color:#84675e}
 .chat-session-actions a,.chat-session-actions button{min-height:44px}.chat-official .chat-bubble p{font-size:14px}.chat-session-actions{flex-wrap:wrap;justify-content:flex-end}.chat-demo-label{flex-wrap:wrap}
-.chat-conversation-summary{max-width:100%;width:100%;border-radius:18px;background:#fffaf5}.chat-summary-text{margin-top:14px!important;padding-top:12px;border-top:1px solid #e4ccbf}.chat-conversation-options{width:100%;max-width:100%}.chat-conversation-options button{width:100%;text-align:left;white-space:normal}.chat-official .chat-footer{padding-top:12px}.chat-official .chat-header{background:#fff9f3f2}
+.chat-conversation-summary{max-width:100%;width:100%;border-radius:18px;background:#fffaf5}.chat-summary-text{margin-top:14px!important;padding-top:12px;border-top:1px solid #e4ccbf}.chat-conversation-options{width:100%;max-width:100%}.chat-conversation-options button{width:100%;text-align:left;white-space:normal}.chat-official .chat-footer{padding-top:12px}
 .chat-conversation-options button[data-choice="Confirmar"],.chat-conversation-options button[data-choice="Verificar resultado"]{background:#ad687e;color:#fffaf5;border-color:#ad687e;font-weight:600;text-align:center}
+
+/* One floral canvas behind the official mobile conversation, including landscape.
+   Only the feed scrolls; the original image stays on its full-height parent. */
+.chat-official{padding:0;background:#fff3eb}
+.chat-official .chat-phone{max-width:none;border-radius:0;box-shadow:none}
+.chat-official .chat-header,.chat-official .chat-demo-label,.chat-official .chat-footer{background:transparent;border:0}
+.chat-official .chat-footer-note{display:block}
+@media(max-height:550px){.chat-official .chat-footer-note{margin-top:4px}}
