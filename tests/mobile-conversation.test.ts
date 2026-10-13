@@ -10,7 +10,7 @@ test('client menu preserves selection, consumes a complete sale and writes only 
   const data = { ...snapshot, clients: [maria, { ...maria, id: 'other', fullName: 'Maria Silva' }] };
   let r = transition(idle, 'Maria', data); assert.equal(r.state.type, 'choose');
   r = transition(r.state, '2', data); assert.equal(r.state.selectedClientId, 'other');
-  assert.deepEqual(r.choices, ['Nova venda', 'Ver saldo devedor', 'Extrato', 'Registrar recebimento', 'Editar cadastro']);
+  assert.deepEqual(r.choices, ['Nova venda', 'Ver saldo', 'Extrato', 'Recebimento', 'Editar cadastro', 'Voltar']);
   r = transition(r.state, 'Nova venda', data); assert.equal(r.state.type, 'finance');
   r = transition(r.state, '2 perfumes a 150 cada, ela pagou 100', data);
   assert.equal(r.action, undefined); assert.match(r.summary!, /Maria Silva/); assert.match(r.summary!, /300,00/); assert.match(r.summary!, /100,00/);
@@ -26,6 +26,27 @@ test('balance queries and missing balance clients never offer registration or mu
   }
   const r = transition({ type: 'idle', selectedClientId: maria.id }, 'Quanto falta pagar?', snapshot);
   assert.match(r.text, /Saldo pendente/); assert.equal(r.action, undefined); assert.deepEqual(snapshot, before);
+});
+
+test('client follow-up offers explicit navigation and exits clear context without touching history', () => {
+  const before = structuredClone(snapshot);
+  for (const query of ['Ver saldo', 'Extrato']) {
+    const menu = transition(idle, 'Maria', snapshot);
+    const consulted = transition(menu.state, query, snapshot);
+    assert.equal(consulted.state.type, 'followUp'); assert.match(consulted.text, /Deseja fazer mais alguma coisa\?/);
+    assert.deepEqual(consulted.choices, ['Outra operação com esta cliente', 'Escolher outra cliente', 'Encerrar']);
+    const reopened = transition(consulted.state, consulted.choices[0], snapshot); assert.equal(reopened.state.type, 'clientMenu');
+    for (const exit of ['Voltar', 'Cancelar', 'Encerrar']) {
+      const closed = transition(consulted.state, exit, snapshot); assert.equal(closed.state.type, 'idle'); assert.equal(closed.state.selectedClientId, null);
+      assert.equal(transition(closed.state, 'Nova venda', snapshot).state.type, 'choose');
+    }
+    for (const change of ['Outra cliente', 'Escolher outra cliente']) { const next = transition(consulted.state, change, snapshot); assert.equal(next.state.type, 'choose'); assert.equal(next.state.selectedClientId, null); }
+  }
+  const edit = transition(transition(idle, 'Maria', snapshot).state, 'Editar cadastro', { ...snapshot, remoteSearch: true });
+  assert.equal(edit.action?.type, 'openClientForm');
+  const payment = transition(transition(idle, 'Maria', snapshot).state, 'Recebimento', snapshot); assert.equal(payment.state.type, 'finance');
+  if (payment.state.type === 'finance') assert.equal(payment.state.draft.value.clientId, maria.id);
+  assert.deepEqual(snapshot, before);
 });
 test('guided product names overlapping query keywords keep a valid draft and ask for quantity', () => {
   let r = transition(idle, 'Nova venda', snapshot);

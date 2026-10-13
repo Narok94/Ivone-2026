@@ -21,6 +21,13 @@
 .chat-official .chat-composer button{background:#b73565}
 .chat-official .chat-success{background:#edf7ef;border-color:#bedbc4;color:#285d3c}
 .chat-official .chat-error,.chat-official .chat-bubble[role="alert"]{background:#fff0f0;border-color:#e8b6bc;color:#a3313f}
+.chat-official .chat-client-menu{width:min(100%,360px);border-radius:20px;background:#fffaf7;border-color:#e4c4cd;padding:16px;box-shadow:0 4px 14px #86515d12}
+.chat-client-menu-heading{margin-bottom:14px}
+.chat-client-menu-heading h2{font-family:Georgia,serif;font-size:21px;font-weight:600;line-height:1.25;color:#86515d;margin:0 0 6px;overflow-wrap:anywhere}
+.chat-official .chat-client-menu-heading p{font-size:13px;line-height:1.5}
+.chat-client-menu .chat-client-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.chat-official .chat-client-menu button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:70px;padding:10px 6px;font-size:12px;line-height:1.3;text-align:center;cursor:pointer}
+.chat-client-menu button svg{flex:none}
 
 /* One floral canvas behind the official mobile conversation, including landscape.
    Only the feed scrolls; the original image stays on its full-height parent. */

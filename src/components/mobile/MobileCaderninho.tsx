@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, ShoppingBag, Wallet, ReceiptText, HandCoins, UserRoundPen, ArrowLeft } from 'lucide-react';
 import { ChatFrame } from './ChatFrame';
 import { useData } from '../../contexto/DataContext';
 import { apiFetch, ApiError } from '../../lib/api';
 import { readPending } from '../../lib/pending-operation';
 import { clientBalance, currency, type FinancialOperation } from '../../lib/finance';
-import { clientFields, clientMenuChoices, clientSummary, searchReply, resumeClient, transition, type Action, type ClientData, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
+import { clientFields, followUp, clientSummary, searchReply, resumeClient, transition, type Action, type ClientData, type ClientRequest, type Reply, type Snapshot, type State } from '../../lib/mobile-conversation';
 import { normalize } from '../../lib/conversation';
 import { ClientForm } from '../forms/ClientForm';
 import { Modal } from '../common/Modal';
@@ -13,6 +13,7 @@ import { Button } from '../common';
 import './client-modal.css';
 
 type Message = { id: number; text: string; own?: boolean; summary?: string; tone?: 'success' | 'error' };
+const menuIcons = [ShoppingBag, Wallet, ReceiptText, HandCoins, UserRoundPen, ArrowLeft];
 export default function MobileCaderninho() {
   const data = useData(); const { user, refreshData, commitOperation, logout, isRefreshing, dataError } = data;
   const clientKey = `ivone_pending_client:${user!.id}`; const restoreKey = `ivone_pending_restore:${user!.id}`;
@@ -44,7 +45,7 @@ export default function MobileCaderninho() {
     if (discard) { setDiscard(false); return; }
     cancelClientForm();
   }
-  function cancelClientForm() { setClientForm(null); setDiscard(false); dirty.current = false; apply(response({ type: 'idle' }, 'Cancelei o formulário. Nenhum dado foi salvo.')); }
+  function cancelClientForm() { setClientForm(null); setDiscard(false); dirty.current = false; apply(response({ type: 'idle', selectedClientId: null }, 'Cancelei o formulário. Nenhum dado foi salvo.')); }
   const busy = useRef(false); const sequence = useRef(1); const attachment = useRef<HTMLInputElement>(null);
   const snapshot = (): Snapshot => ({ clients: data.clients, sales: data.sales, payments: data.payments, remoteSearch: true });
   async function search(query: string, offset = 0) {
@@ -53,7 +54,7 @@ export default function MobileCaderninho() {
   }
   const append = (text: string, own = false, summary?: string, tone?: Message['tone']) => setMessages(old => [...old, { id: sequence.current++, text, own, summary, tone }]);
   function apply(next: Reply, tone?: Message['tone']) {
-    next = { ...next, state: { ...next.state, selectedClientId: next.state.selectedClientId ?? (next.state.type === 'finance' ? next.state.draft.value.clientId : undefined) ?? current.current.state.selectedClientId } };
+    next = { ...next, state: { ...next.state, selectedClientId: next.state.selectedClientId !== undefined ? next.state.selectedClientId : (next.state.type === 'finance' ? next.state.draft.value.clientId : undefined) ?? current.current.state.selectedClientId } };
     current.current = next; setReply(next); if (next.text) append(next.text, false, next.summary, tone);
   }
   const response = (state: State, text: string, choices: string[] = []): Reply => ({ state, text, choices });
@@ -90,7 +91,7 @@ export default function MobileCaderninho() {
       if (request) {
         const result = await checkClient(request);
         if (result.state.type !== 'pendingClient') {
-          apply({ ...result, text: `${request.mode === 'edit' ? `Dados de ${request.data.fullName} atualizados` : `Cliente ${request.data.fullName} cadastrado`} com sucesso!${request.resume ? '\n' + result.text : ''}` });
+          apply({ ...result, text: `${request.mode === 'edit' ? `Dados de ${request.data.fullName} atualizados` : `Cliente ${request.data.fullName} cadastrado`} com sucesso!${request.resume ? '\n' + result.text : '\n\nDeseja fazer mais alguma coisa?'}` });
           modalPending.current = null; setPendingSave(false); setClientForm(null); dirty.current = false; return;
         }
         throw new Error('Ainda não consegui comprovar o salvamento. Consulte novamente; não vou repetir a gravação.');
@@ -107,7 +108,7 @@ export default function MobileCaderninho() {
         data.rememberClients([saved]);
         sessionStorage.removeItem(clientKey); modalPending.current = null; setPendingSave(false);
         const next = resumeClient(request, saved, snapshot());
-        apply({ ...next, text: `${request.mode === 'edit' ? `Dados de ${saved.fullName} atualizados` : `Cliente ${saved.fullName} cadastrado`} com sucesso!${request.resume ? '\n' + next.text : ''}` }, 'success');
+        apply({ ...next, text: `${request.mode === 'edit' ? `Dados de ${saved.fullName} atualizados` : `Cliente ${saved.fullName} cadastrado`} com sucesso!${request.resume ? '\n' + next.text : '\n\nDeseja fazer mais alguma coisa?'}` }, 'success');
         setClientForm(null); dirty.current = false;
       } catch (error) {
         if (error instanceof ApiError && [400, 404, 409, 422].includes(error.status)) {
@@ -148,7 +149,7 @@ export default function MobileCaderninho() {
       apply(response({ type: 'pendingFinancial', operation }, 'Conferindo sua confirmação…'));
       try {
         const result = await commitOperation(operation); const name = data.clients.find(c => c.id === result.clientId)?.fullName ?? 'Cliente';
-        apply(response({ type: 'idle', selectedClientId: operation.clientId }, `${result.replayed ? 'Já estava salvo; não dupliquei.' : operation.kind.startsWith('delete_') ? 'Lançamento excluído.' : operation.kind.startsWith('edit_') ? 'Lançamento atualizado.' : 'Anotado com carinho!'}\n${name}\n${result.balanceCents >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(result.balanceCents))}`, clientMenuChoices), 'success');
+        apply(followUp(operation.clientId, `${result.replayed ? 'Já estava salvo; não dupliquei.' : operation.kind.startsWith('delete_') ? 'Lançamento excluído.' : operation.kind.startsWith('edit_') ? 'Lançamento atualizado.' : 'Anotado com carinho!'}\n${name}\n${result.balanceCents >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(result.balanceCents))}`), 'success');
       } catch (e) {
         if (e instanceof ApiError && [400, 404, 422].includes(e.status) && draft) apply({ ...transition(before, 'Corrigir', snapshot()), text: `${e.message}\nO que devo corrigir?` });
         else apply(response({ type: 'pendingFinancial', operation }, 'A confirmação foi enviada, mas não consegui comprovar o resultado. Vou usar o mesmo identificador, sem duplicar. Não comece outra operação ainda.', ['Verificar resultado']));
@@ -221,7 +222,10 @@ export default function MobileCaderninho() {
   </>}>
     {dataError && <div className="chat-bubble" role="alert"><p>{dataError}</p><button disabled={working} onClick={() => void send('Verificar resultado')}>Tentar atualizar</button></div>}
     {messages.map(message => <div key={message.id} className={`chat-bubble ${message.own ? 'chat-own' : ''} ${message.summary ? 'chat-conversation-summary' : ''} ${message.tone ? `chat-${message.tone}` : ''}`}><p>{message.text}</p>{message.summary && <p className="chat-summary-text">{message.summary}</p>}<span className="chat-bubble-caption">{message.own ? 'Você ✓✓' : 'Caderninho'}</span></div>)}
-    {!!reply.choices.length && <div className="chat-bubble chat-conversation-options" aria-label="Respostas disponíveis"><div className="chat-client-options">{reply.choices.map((choice, index) => <button key={`${index}:${choice}`} data-choice={choice} disabled={working || isRefreshing || blocked} onClick={() => void send(choice)}>{choice}</button>)}</div></div>}
+    {!!reply.choices.length && <div className={`chat-bubble chat-conversation-options ${reply.state.type === 'clientMenu' ? 'chat-client-menu' : ''}`} aria-label={reply.state.type === 'clientMenu' ? 'Operações da cliente' : 'Respostas disponíveis'}>
+      {reply.state.type === 'clientMenu' && <div className="chat-client-menu-heading"><h2>{reply.state.person.fullName}</h2><p>O que deseja fazer com esta cliente?</p></div>}
+      <div className="chat-client-options">{reply.choices.map((choice, index) => { const Icon = reply.state.type === 'clientMenu' ? menuIcons[index] : null; return <button key={`${index}:${choice}`} data-choice={choice} disabled={working || isRefreshing || blocked} onClick={() => void send(choice)}>{Icon && <Icon size={19} strokeWidth={1.6} aria-hidden="true" />}<span>{choice}</span></button>; })}</div>
+    </div>}
   </ChatFrame></div>
     <Modal isOpen={Boolean(clientForm)} clientMode onClose={closeClientForm} title={clientForm?.original ? 'Editar cliente' : 'Cadastrar cliente'}>
       {clientForm && <>

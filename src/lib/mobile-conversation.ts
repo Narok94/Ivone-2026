@@ -7,9 +7,11 @@ import { brCents, cents, clientBalance, currency, dateLabel, lineTotal, MAX_CENT
 export type Snapshot = { clients: Client[]; sales: Sale[]; payments: Payment[]; remoteSearch?: boolean };
 const emptyClient = (): ClientData => Object.fromEntries(clientFields.map(([key]) => [key, ''])) as ClientData;
 export type FinanceDraft = { value: Interpretation; kind: FinancialOperation['kind']; sourceText?: string; targetId?: string; received?: number; allowCredit?: boolean; expectedRemaining?: number; paymentHint?: 'all' | 'none'; guided?: boolean; moreAsked?: boolean; needsDate?: boolean; validatedQuantity?: number[] };
-type QueryKind = 'client' | 'balance' | 'statement' | 'received';
+type QueryKind = 'client' | 'menu' | 'balance' | 'statement' | 'received';
 type ConversationState =
   | { type: 'idle' }
+  | { type: 'clientMenu'; person: Client }
+  | { type: 'followUp' }
   | { type: 'choose'; candidates: Client[]; purpose: QueryKind | 'editClient' | 'deleteClient' | 'editSale' | 'deleteSale' | 'editPayment' | 'deletePayment' | 'finance'; draft?: FinanceDraft; query?: string; offset?: number; hasMore?: boolean }
   | { type: 'missingClient'; query: string; selection: Extract<State, { type: 'choose' }> }
   | { type: 'finance'; draft: FinanceDraft; step: 'product' | 'quantity' | 'price' | 'priceMode' | 'more' | 'payment' | 'partial' | 'credit' | 'date' | 'notes' | 'correct' | 'confirm'; index: number }
@@ -23,16 +25,19 @@ type ConversationState =
   | { type: 'pendingFinancial'; operation: FinancialOperation }
   | { type: 'pendingClient'; request: ClientRequest }
   | { type: 'blocked'; reason: string };
-export type State = ConversationState & { selectedClientId?: string };
+export type State = ConversationState & { selectedClientId?: string | null };
 export type ClientRequest = { mode: 'create' | 'edit' | 'delete'; data: ClientData; id?: string; beforeIds: string[]; resume?: FinanceDraft };
 export type Action = { type: 'openClientForm'; form: Extract<State, { type: 'clientForm' }> } | { type: 'searchClients'; selection: Extract<State, { type: 'choose' }>; query: string; offset: number } | { type: 'checkDuplicate'; client: Extract<State, { type: 'client' }> } | { type: 'financial'; draft: FinanceDraft } | { type: 'retryFinancial'; operation: FinancialOperation } | { type: 'client'; request: ClientRequest } | { type: 'checkClient'; request: ClientRequest } | { type: 'theme'; dark: boolean } | { type: 'backup' } | { type: 'restore'; state: Extract<State, { type: 'restore' }> } | { type: 'logout' };
 export type Reply = { state: State; text: string; choices: string[]; summary?: string; action?: Action };
 const idle: State = { type: 'idle' };
 function answer(state: State, text: string, choices: string[] = [], summary?: string, action?: Action): Reply { return { state, text, choices, summary, action }; }
 const confirmChoices = ['Confirmar', 'Corrigir', 'Cancelar'];
-export const clientMenuChoices = ['Nova venda', 'Ver saldo devedor', 'Extrato', 'Registrar recebimento', 'Editar cadastro'];
-function clientMenu(person: Client, text = `O que deseja fazer para ${person.fullName}?`): Reply {
-  return answer({ type: 'idle', selectedClientId: person.id }, text, clientMenuChoices);
+export const clientMenuChoices = ['Nova venda', 'Ver saldo', 'Extrato', 'Recebimento', 'Editar cadastro', 'Voltar'];
+function clientMenu(person: Client): Reply {
+  return answer({ type: 'clientMenu', person, selectedClientId: person.id }, '', clientMenuChoices);
+}
+export function followUp(clientId: string, text: string): Reply {
+  return answer({ type: 'followUp', selectedClientId: clientId }, `${text}\n\nDeseja fazer mais alguma coisa?`, ['Outra operação com esta cliente', 'Escolher outra cliente', 'Encerrar']);
 }
 const amount = (text: string) => { const value = brCents(text); if (value < 0 || value > MAX_CENTS) throw new Error('Confira o valor: use reais e até dois centavos decimais.'); return value; };
 export function parseChatDate(text: string): string | null {
@@ -151,7 +156,7 @@ export function searchReply(selection: Extract<State, { type: 'choose' }>, resul
   return answer(state, `${result.uncertain ? 'Encontrei nomes parecidos. Confira com cuidado:' : 'Encontrei estas clientes:'}\n${result.clients.map((c, i) => `${i + 1}. ${c.fullName}${result.clients.filter(p => normalize(p.fullName) === normalize(c.fullName)).length > 1 ? ` · telefone: ${c.phone || 'não informado'} · ${c.id.slice(-6)}` : ''}`).join('\n')}\nQual delas?`, result.clients.map((c, i) => `${i + 1}. ${c.fullName}`).concat(result.hasMore ? ['Mais resultados', 'Buscar novamente', 'Cancelar'] : ['Buscar novamente', 'Cancelar']));
 }
 export function resumeClient(request: ClientRequest, person: Client, data: Snapshot): Reply {
-  if (!request.resume) return clientMenu(person, `Cadastro de ${person.fullName} salvo.`);
+  if (!request.resume) return followUp(person.id, `Cadastro de ${person.fullName} salvo.`);
   const next = readyFinance({ ...request.resume, value: { ...request.resume.value, clientId: person.id, candidates: [person] } }, { ...data, clients: [person, ...data.clients.filter(c => c.id !== person.id)] });
   return { ...next, text: `Cadastro de ${person.fullName} salvo. Vamos continuar a venda.\n${next.text}` };
 }
@@ -165,10 +170,11 @@ function personReply(state: Extract<State, { type: 'choose' }>, person: Client, 
     const parsed = draft.sourceText && draft.kind === 'sale' ? parseChatSale(draft.sourceText, [person]) : draft;
     return readyFinance({ ...draft, sourceText: undefined, value: { ...parsed.value, clientId: person.id, candidates: [person], question: undefined } }, data);
   }
-  if (state.purpose === 'client') return clientMenu(person, `${person.fullName}\n${balanceText(data, person.id)}\nO que deseja fazer?`);
-  if (state.purpose === 'balance') return clientMenu(person, `${person.fullName}\n${balanceText(data, person.id)}`);
+  if (state.purpose === 'menu') return clientMenu(person);
+  if (state.purpose === 'client') return followUp(person.id, `${clientSummary(person)}\n${balanceText(data, person.id)}`);
+  if (state.purpose === 'balance') return followUp(person.id, `${person.fullName}\n${balanceText(data, person.id)}`);
   if (state.purpose === 'received') return answer({ type: 'period', query: 'received', clientId: person.id }, `Qual período dos recebimentos de ${person.fullName}?`, ['Hoje', 'Este mês', 'Todo o histórico', 'Cancelar']);
-  if (state.purpose === 'statement') return clientMenu(person, `${history(data, 'all', person.id)}\n${balanceText(data, person.id)}\nRecebimentos são agregados por cliente; não há parcelas formais.`);
+  if (state.purpose === 'statement') return followUp(person.id, `${history(data, 'all', person.id)}\n${balanceText(data, person.id)}\nRecebimentos são agregados por cliente; não há parcelas formais.`);
   if (state.purpose === 'editClient') return data.remoteSearch ? offerClientForm({ type: 'clientForm', original: person, data: { ...person }, stage: 'offer' }) : answer({ type: 'client', original: person, data: { ...person }, step: 'field' }, `O que quer alterar em ${person.fullName}? Diga nome, telefone, e-mail, CPF, CEP, rua, número, complemento, bairro, cidade, estado ou observações.`, ['Cancelar']);
   if (state.purpose === 'deleteClient') {
     if (data.sales.some(s => s.clientId === person.id) || data.payments.some(p => p.clientId === person.id)) return answer(idle, 'Esta cliente tem lançamentos. Não vou excluir seu cadastro para preservar o histórico.');
@@ -214,18 +220,23 @@ function valueForOperation(state: Extract<State, { type: 'record' }>, row: Sale 
 
 export function transition(current: State, input: string, snapshot: Snapshot): Reply {
   const next = transitionReply(current, input, snapshot);
-  return { ...next, state: { ...next.state, selectedClientId: next.state.selectedClientId ?? current.selectedClientId } };
+  return { ...next, state: { ...next.state, selectedClientId: next.state.selectedClientId !== undefined ? next.state.selectedClientId : current.selectedClientId } };
 }
 function transitionReply(current: State, input: string, snapshot: Snapshot): Reply {
   // Do not mutate React state or a confirmed request while interpreting a new reply.
   const state: State = structuredClone(current); const text = input.trim(); const clean = normalize(text);
-  const cancelled = clean === 'cancelar' || clean === 'cancela' || clean === 'cancelar operacao';
+  const cancelled = /^(cancelar|cancela|cancelar operacao|voltar|encerrar|outra cliente|escolher outra cliente)$/.test(clean);
   if (cancelled) {
     if (state.type === 'pendingFinancial' || state.type === 'pendingClient' || state.type === 'blocked' || (state.type === 'attachment' && state.attempted) || (state.type === 'restore' && state.attempted)) return answer(state, 'A confirmação já foi enviada. Precisamos verificar seu resultado antes de outra operação.', ['Verificar resultado']);
-    return answer(idle, 'Cancelei. Nenhuma alteração foi enviada.');
+    if (clean === 'outra cliente' || clean === 'escolher outra cliente') { const next = choose(snapshot, 'menu', ''); return { ...next, state: { ...next.state, selectedClientId: null } }; }
+    return answer({ type: 'idle', selectedClientId: null }, /cancel/.test(clean) ? 'Cancelei. Nenhuma alteração foi enviada.' : 'Atendimento encerrado. Pode conversar livremente.');
   }
   try {
     if (state.type === 'blocked') return answer(state, state.reason);
+    if (clean === 'outra operacao com esta cliente' && (state.type === 'followUp' || state.type === 'clientMenu')) {
+      const person = snapshot.clients.find(c => c.id === state.selectedClientId);
+      return person ? clientMenu(person) : answer({ type: 'idle', selectedClientId: null }, 'Não encontrei essa cliente. Digite o nome para buscar novamente.');
+    }
     if (state.type === 'clientForm') {
       if (state.stage === 'name') return offerClientForm({ ...state, data: { ...state.data, fullName: fieldValue('fullName', text) } });
       if (state.stage === 'offer' && /^(sim|sim, cadastrar|confirmar)$/.test(clean)) { const form = { ...state, stage: 'open' as const }; return answer(form, 'Preencha o formulário. Só vou salvar quando você tocar em Salvar.', [], undefined, { type: 'openClientForm', form }); }
@@ -356,9 +367,13 @@ function transitionReply(current: State, input: string, snapshot: Snapshot): Rep
     }
     // New requests always start from the shared server snapshot, not invented records.
     const selected = snapshot.clients.find(c => c.id === state.selectedClientId);
-    if (/^(?:ver saldo devedor|saldo|quanto falta pagar|quanto (?:ela|ele) deve)\??$/.test(clean)) return selected ? clientMenu(selected, `${selected.fullName}\n${balanceText(snapshot, selected.id)}`) : choose(snapshot, 'balance', '');
+    if (/^(?:ver saldo|ver saldo devedor|saldo|quanto falta pagar|quanto (?:ela|ele) deve)\??$/.test(clean)) return selected ? followUp(selected.id, `${selected.fullName}\n${balanceText(snapshot, selected.id)}`) : choose(snapshot, 'balance', '');
     if (clean === 'extrato' && selected) return personReply({ type: 'choose', purpose: 'statement', candidates: [selected] }, selected, snapshot);
-    if (clean === 'editar cadastro') return selected ? choosePerson({ type: 'choose', purpose: 'editClient', candidates: [selected] }, selected, snapshot) : choose(snapshot, 'editClient', '');
+    if (clean === 'editar cadastro') {
+      if (!selected) return choose(snapshot, 'editClient', '');
+      const next = choosePerson({ type: 'choose', purpose: 'editClient', candidates: [selected] }, selected, snapshot);
+      return next.state.type === 'clientForm' ? transition(next.state, 'Sim', snapshot) : next;
+    }
     if (/^(?:cadastrar|cadastre|cadastro|nova|novo|adicionar)\s+(?:uma?\s+)?cliente\b/.test(clean)) {
       const details = text.replace(/^(?:cadastrar|cadastre|cadastro|nova|novo|adicionar)\s+(?:uma?\s+)?cliente\s*(?:chamada\s+)?/i, '').trim();
       const name = details.split(/[,;]|\s+(?:telefone|celular|email|e-mail|cpf|cep|rua|endere[çc]o|n[uú]mero|complemento|bairro|cidade|estado|observa[çc][aã]o)\s*[: ]/i)[0].trim().replace(/[.!]$/, '');
@@ -406,7 +421,7 @@ function transitionReply(current: State, input: string, snapshot: Snapshot): Rep
       if (!parsed.period) return answer({ type: 'period', query: 'received', clientId: parsed.clientId }, 'Qual período?', ['Hoje', 'Este mês', 'Todo o histórico', 'Cancelar']);
       return transition({ type: 'period', query: 'received', clientId: parsed.filterClient ? parsed.clientId : undefined }, parsed.period === 'today' ? 'Hoje' : parsed.period === 'month' ? 'Este mês' : 'Todo o histórico', snapshot);
     }
-    if (/^[\p{L}][\p{L}\s'.-]{0,299}$/u.test(text)) return choose(snapshot, 'client', text);
+    if (/^[\p{L}][\p{L}\s'.-]{0,299}$/u.test(text)) return choose(snapshot, 'menu', text);
     return answer(idle, 'Não entendi com segurança. Pode dizer quem comprou, quais produtos e o valor, ou pedir cadastrar cliente, pagamento, extrato, histórico ou relatório?');
   } catch (error: any) { return answer(current, error.message || 'Pode explicar de outra forma? Nenhuma alteração foi enviada.', ['Cancelar']); }
 }

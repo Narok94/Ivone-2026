@@ -55,7 +55,7 @@ try {
   await page.getByRole('button',{name:'Salvar cliente',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
   await say('Editar cliente Ana'); await say('Sim'); await page.getByLabel('Telefone',{exact:true}).fill('11999990000'); await page.getByRole('button',{name:'Salvar alterações',exact:true}).click();await page.getByRole('dialog').waitFor({state:'hidden'});
   assert.equal((await pool.query("SELECT phone FROM clientes WHERE full_name='Ana'")).rows[0].phone.replace(/\D/g,''), '11999990000');
-  await say('Editar cadastro'); await say('Sim');
+  await say('Editar cadastro');
   await page.route('https://viacep.com.br/**', route => route.abort());
   await page.getByLabel('CEP', { exact: true }).fill('01001000'); await page.getByLabel('Rua / Logradouro').fill('Rua manual');
   await page.getByText('Você pode preencher o endereço manualmente.', { exact: false }).waitFor();
@@ -66,11 +66,23 @@ try {
   await pool.query("INSERT INTO clientes(full_name) VALUES ('Jessica Silva')");
   await say('Jessica'); assert.equal(await page.locator('.chat-client-options button').filter({ hasText: /^\d+\. / }).count(), 2);
   await say('2'); await page.getByRole('button', { name: 'Editar cadastro', exact: true }).waitFor();
+  const menu = page.getByLabel('Operações da cliente');
+  assert.equal(await menu.getByRole('button').count(), 6);
+  assert.equal(await menu.locator('svg').count(), 6);
+  assert.equal(await menu.locator('h2').innerText(), 'Jessica Silva');
+  assert.equal(await menu.locator('.chat-client-options').evaluate(el => getComputedStyle(el).gridTemplateColumns.split(' ').length), 2);
+  await page.getByRole('button', { name: 'Ver saldo', exact: true }).click(); await wait();
+  assert.equal(await page.getByLabel('Operações da cliente').count(), 0);
+  await page.getByRole('button', { name: 'Outra operação com esta cliente', exact: true }).click(); await wait();
+  await page.getByRole('button', { name: 'Extrato', exact: true }).click(); await wait();
+  await page.getByRole('button', { name: 'Escolher outra cliente', exact: true }).click(); await wait();
   await say('Maria');
   await say('Nova venda'); await say('perfume'); await say('dois'); await say('150'); await say('Não, continuar'); await say('Pagou uma parte'); await say('100');
   assert.deepEqual(await counts(), { sales: 0, payments: 0 });
   await say('Corrigir'); await say('valor'); await say('160'); await say('Confirmar venda');
   assert.deepEqual(await counts(), { sales: 1, payments: 1 });
+  assert.equal(await page.getByLabel('Operações da cliente').count(), 0);
+  await page.getByRole('button', { name: 'Encerrar', exact: true }).click(); await wait();
   await say('Venda Maria sabonete 25'); await say('Pagou tudo'); await say('Confirmar');
   assert.deepEqual(await counts(), { sales: 2, payments: 2 });
   await say('Maria pagou 20 reais'); await say('Confirmar');
@@ -84,7 +96,7 @@ try {
   await say('Saldo da Desconhecida'); assert.equal(await page.getByRole('button', { name: 'Sim, cadastrar', exact: true }).count(), 0); await say('Cancelar');
   const original = (await pool.query("SELECT * FROM clientes WHERE full_name='Maria'")).rows[0];
   const history = (await pool.query('SELECT id,client_id,total FROM vendas ORDER BY id')).rows;
-  await say('Editar cadastro'); await say('Sim'); await page.getByLabel('Telefone', { exact: true }).fill('11988887777');
+  await say('Maria'); await say('Editar cadastro'); await page.getByLabel('Telefone', { exact: true }).fill('11988887777');
   await page.getByRole('button', { name: 'Salvar alterações', exact: true }).click(); await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal((await pool.query("SELECT id FROM clientes WHERE full_name='Maria'")).rows[0].id, original.id);
   assert.deepEqual((await pool.query('SELECT id,client_id,total FROM vendas ORDER BY id')).rows, history);
@@ -93,6 +105,11 @@ try {
   assert.match(await page.locator('.chat-summary-text').last().innerText(), /Recebido agora:.*100,00/);
   assert.deepEqual(await counts(), { sales: 2, payments: 3 }); await say('Cancelar');
   await say('Mostra o extrato da Maria'); assert.match(await page.locator('.chat-bubble p').last().innerText(), /Extrato de Maria/);
+  await page.getByRole('button', { name: 'Outra operação com esta cliente', exact: true }).click(); await wait();
+  await page.getByRole('button', { name: 'Recebimento', exact: true }).click(); await wait();
+  await say('10'); assert.match(await page.locator('.chat-summary-text').last().innerText(), /Maria/); await say('Cancelar');
+  await say('Maria'); await page.getByRole('button', { name: 'Voltar', exact: true }).click(); await wait();
+  await say('Nova venda'); assert.deepEqual(await page.locator('.chat-client-options button').allTextContents(), ['Cancelar']); await say('Cancelar');
   assert.deepEqual(errors, []);
   console.log('PASS essential flows: client selection/menu/context, modal create/edit/discard/CEP fallback, confirmation before writes, balance queries read-only, IDs and financial history preserved');
   }
