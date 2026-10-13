@@ -10,6 +10,7 @@ import { normalize } from '../../lib/conversation';
 import { ClientForm } from '../forms/ClientForm';
 import { Modal } from '../common/Modal';
 import { Button } from '../common';
+import { FinancialSummary } from './FinancialSummary';
 import './client-modal.css';
 
 type Message = { id: number; text: string; own?: boolean; summary?: string; tone?: 'success' | 'error' };
@@ -34,6 +35,7 @@ export default function MobileCaderninho() {
   const [reply, setReply] = useState<Reply>(initial); const current = useRef(reply);
   const [messages, setMessages] = useState<Message[]>([{ id: 0, text: reply.text }]);
   const [input, setInput] = useState(''); const [working, setWorking] = useState(false);
+  const [financialRevision, setFinancialRevision] = useState(0); const [debtorsOpen, setDebtorsOpen] = useState(false);
   const [clientForm, setClientForm] = useState<Extract<State, { type: 'clientForm' }> | null>(null);
   const dirty = useRef(false); const savingClient = useRef(false);
   const modalPending = useRef<ClientRequest | null>(null); const [pendingSave, setPendingSave] = useState(false);
@@ -53,6 +55,17 @@ export default function MobileCaderninho() {
     data.rememberClients(result.clients); return result;
   }
   const append = (text: string, own = false, summary?: string, tone?: Message['tone']) => setMessages(old => [...old, { id: sequence.current++, text, own, summary, tone }]);
+  async function selectDebtor(id: string) {
+    if (busy.current || !['idle', 'clientMenu', 'followUp'].includes(current.current.state.type)) throw new Error('Conclua ou cancele a operação atual para selecionar outra cliente.');
+    busy.current = true; setWorking(true);
+    try {
+      const people = await (await apiFetch(`/api/clients?id=${encodeURIComponent(id)}`)).json();
+      const person = people.find((c: any) => c.id === id);
+      if (!person) throw new Error('Essa cliente não está mais disponível. Atualize a lista.');
+      data.rememberClients([person]); const fresh = await refreshData();
+      apply(transition({ type: 'choose', purpose: 'menu', candidates: [person] }, '1', { ...fresh, remoteSearch: true }));
+    } finally { busy.current = false; setWorking(false); }
+  }
   function apply(next: Reply, tone?: Message['tone']) {
     next = { ...next, state: { ...next.state, selectedClientId: next.state.selectedClientId !== undefined ? next.state.selectedClientId : (next.state.type === 'finance' ? next.state.draft.value.clientId : undefined) ?? current.current.state.selectedClientId } };
     current.current = next; setReply(next); if (next.text) append(next.text, false, next.summary, tone);
@@ -148,7 +161,7 @@ export default function MobileCaderninho() {
       const operation: FinancialOperation = action.type === 'retryFinancial' ? action.operation : { operationId: crypto.randomUUID(), confirmed: true, kind: draft!.kind, targetId: draft!.targetId, clientId: draft!.value.clientId!, date: draft!.value.date, observation: draft!.value.observation, items: draft!.value.items.map(i => ({ ...i, unitCents: i.unitCents! })), receivedCents: draft!.received ?? 0, amountCents: draft!.value.amountCents, allowCredit: draft!.allowCredit };
       apply(response({ type: 'pendingFinancial', operation }, 'Conferindo sua confirmação…'));
       try {
-        const result = await commitOperation(operation); const name = data.clients.find(c => c.id === result.clientId)?.fullName ?? 'Cliente';
+        const result = await commitOperation(operation); setFinancialRevision(n => n + 1); const name = data.clients.find(c => c.id === result.clientId)?.fullName ?? 'Cliente';
         apply(followUp(operation.clientId, `${result.replayed ? 'Já estava salvo; não dupliquei.' : operation.kind.startsWith('delete_') ? 'Lançamento excluído.' : operation.kind.startsWith('edit_') ? 'Lançamento atualizado.' : 'Anotado com carinho!'}\n${name}\n${result.balanceCents >= 0 ? 'Saldo pendente' : 'Crédito'}: ${currency(Math.abs(result.balanceCents))}`), 'success');
       } catch (e) {
         if (e instanceof ApiError && [400, 404, 422].includes(e.status) && draft) apply({ ...transition(before, 'Corrigir', snapshot()), text: `${e.message}\nO que devo corrigir?` });
@@ -185,7 +198,7 @@ export default function MobileCaderninho() {
       const state = action.state; sessionStorage.setItem(restoreKey, JSON.stringify({ hash: state.hash, restoreId: state.restoreId })); apply(response({ ...state, attempted: true }, 'Conferindo a restauração…'));
       try {
         await apiFetch('/api/backup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: state.data, restoreId: state.restoreId, backupFingerprint: state.fingerprint, confirmed: true }) });
-        sessionStorage.removeItem(restoreKey); const fresh = await refreshData(); apply(response({ type: 'idle' }, `Restauração concluída. Usuários foram preservados.\n${fresh.clients.map(c => `${c.fullName}: ${balanceLabel(fresh, c.id)}`).join('\n') || 'Não há clientes no arquivo.'}`));
+        sessionStorage.removeItem(restoreKey); setFinancialRevision(n => n + 1); const fresh = await refreshData(); apply(response({ type: 'idle' }, `Restauração concluída. Usuários foram preservados.\n${fresh.clients.map(c => `${c.fullName}: ${balanceLabel(fresh, c.id)}`).join('\n') || 'Não há clientes no arquivo.'}`));
       } catch (e) {
         if (e instanceof ApiError && [400, 404, 409, 422].includes(e.status)) { sessionStorage.removeItem(restoreKey); apply(response({ type: 'idle' }, `Restauração recusada pelo servidor: ${e.message}\nConsulte os registros e comece uma nova conversa de restauração se necessário.`)); }
         else apply(response({ ...state, attempted: true }, `${e instanceof Error ? e.message : 'Não consegui comprovar o resultado.'}\nVou usar a mesma confirmação para verificar.`, ['Verificar resultado']));
@@ -215,7 +228,7 @@ export default function MobileCaderninho() {
     finally { busy.current = false; setWorking(false); }
   }
   const blocked = reply.state.type === 'blocked';
-  return <><div inert={Boolean(clientForm)} aria-hidden={clientForm ? true : undefined}><ChatFrame revision={`${messages.length}:${working}`} actions={<button disabled={working || reply.state.type !== 'idle'} onClick={() => void send('Sair')}>Sair</button>} footer={<>
+  return <><div inert={Boolean(clientForm) || debtorsOpen} aria-hidden={clientForm || debtorsOpen ? true : undefined}><ChatFrame revision={`${messages.length}:${working}`} summary={<FinancialSummary revision={financialRevision} canSelect={!working && ['idle', 'clientMenu', 'followUp'].includes(reply.state.type)} onSelect={selectDebtor} onModalChange={setDebtorsOpen} />} actions={<button disabled={working || reply.state.type !== 'idle'} onClick={() => void send('Sair')}>Sair</button>} footer={<>
     <form className="chat-composer" onSubmit={event => { event.preventDefault(); void send(input); }}><input value={input} onChange={event => setInput(event.target.value)} placeholder="Converse com seu Caderninho…" aria-label="Mensagem" maxLength={2000} autoComplete="off" disabled={working || blocked} /><button type="submit" aria-label="Enviar mensagem" disabled={!input.trim() || working || blocked}><ArrowUp size={22} /></button></form>
     {reply.state.type === 'attachment' && <input ref={attachment} hidden aria-label="Arquivo de backup" type="file" accept=".json" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void attach(file); }} />}
     <p className="chat-footer-note">{user?.username === 'Teste local fictício' ? 'Teste local · dados fictícios · só salvo após confirmar.' : 'Só anoto depois da sua confirmação.'}</p>

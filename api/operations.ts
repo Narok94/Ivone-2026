@@ -1,12 +1,14 @@
 import { requireSession } from '../server/lib/session.js';
 import { executeFinancial, FinancialError, readFinancialSnapshot } from '../server/lib/financial.js';
 import { pool } from './db.js';
+import { readMobileFinancial } from '../server/lib/mobile-financial.js';
 
 export default async function handler(req: any, res: any) {
   const session = await requireSession(req, res);
   if (!session) return;
   if (req.method === 'GET') {
     try {
+      if (req.query?.mode === 'overview' || req.query?.mode === 'debtors') return res.json(await readMobileFinancial(pool, req.query.mode, req.query.q ?? '', req.query.offset ?? 0));
       let ids: string[] | undefined;
       if (req.query?.mode === 'chat') {
         ids = typeof req.query.ids === 'string' && req.query.ids ? req.query.ids.split(',') : [];
@@ -14,7 +16,7 @@ export default async function handler(req: any, res: any) {
       }
       return res.json(await readFinancialSnapshot(pool, ids));
     }
-    catch { return res.status(503).json({ message: 'Não foi possível atualizar os registros.' }); }
+    catch (error) { return res.status(error instanceof FinancialError ? error.status : 503).json({ message: error instanceof FinancialError ? error.message : 'Não foi possível atualizar os registros.' }); }
   }
   if (req.method !== 'POST') return res.status(405).json({ message: 'Método não permitido.' });
   try { return res.json(await executeFinancial(pool, String(session.user.id), req.body)); }

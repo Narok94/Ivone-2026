@@ -32,6 +32,46 @@ try {
     assert.equal(session.localSandbox, true);
     assert.match(session.user.id, /^local-/);
     console.log('PASS local startup/session/shutdown; production/Vercel demo denied; no real credentials');
+  } else if (process.argv.includes('--financial-summary-only')) {
+    const { today } = await import('../src/lib/finance.js'); const date = today();
+    const previous = new Date(date.slice(0, 7) + '-01T12:00:00Z'); previous.setUTCDate(previous.getUTCDate() - 1); const old = previous.toISOString().slice(0, 10);
+    const first = (await pool.query("SELECT id FROM clientes WHERE full_name='Jessica'")).rows[0].id;
+    const second = (await pool.query("INSERT INTO clientes(full_name) VALUES ('Jessica') RETURNING id")).rows[0].id;
+    const sale = (id: string, amount: string, day: string) => pool.query("INSERT INTO vendas(client_id,sale_date,product_name,quantity,unit_price,total) VALUES ($1,$2,'Fictício',1,$3,$3)", [id, day, amount]);
+    const payment = (id: string, amount: string, day: string) => pool.query('INSERT INTO pagamentos(client_id,payment_date,amount) VALUES ($1,$2,$3)', [id, day, amount]);
+    await sale(first, '100.25', date); await sale(first, '200.50', old); await payment(first, '0.25', date); await payment(first, '10.50', date);
+    await sale(second, '50.11', old); await sale(second, '0.12', old);
+    const credit = (await pool.query("INSERT INTO clientes(full_name) VALUES ('Crédito fictício') RETURNING id")).rows[0].id; await sale(credit, '1.00', old); await payment(credit, '2.00', old);
+    for (let i = 0; i < 23; i++) { const person = (await pool.query("INSERT INTO clientes(full_name) VALUES ('Fictícia ' || $1) RETURNING id", [String(i)])).rows[0]; await sale(person.id, '0.01', old); }
+    for (const mode of ['overview', 'debtors']) assert.equal((await fetch(`${base}/api/operations?mode=${mode}`)).status, 401);
+    browser = await chromium.launch({ headless: true, channel: 'msedge' });
+    const context = await browser.newContext({ viewport: { width: 393, height: 852 } }); const page = await context.newPage();
+    const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+    await page.route('https://fonts.googleapis.com/**', route => route.abort()); await page.route('https://fonts.gstatic.com/**', route => route.abort());
+    await page.goto(base); await page.getByRole('heading', { name: 'Caderninho', exact: true }).waitFor();
+    const expectTotal = (kind: string, amount: string) => page.waitForFunction(({ kind, amount }) => document.querySelector(`[data-indicator="${kind}"] strong`)?.textContent?.replace(/\s/g, ' ').includes(amount), { kind, amount });
+    await expectTotal('sales', '100,25'); await expectTotal('received', '10,75'); await expectTotal('pending', '340,46');
+    assert.equal(await page.locator('.mobile-financial-summary').evaluate(el => el.getBoundingClientRect().height < 100), true);
+    await page.getByRole('button', { name: /Total a receber/ }).click(); const dialog = page.getByRole('dialog', { name: 'Clientes com saldo devedor' }); await dialog.waitFor();
+    await page.waitForFunction(() => document.querySelectorAll('[data-client-id]').length === 20);
+    assert.equal(await page.locator('[data-client-id]').first().getAttribute('data-client-id'), first);
+    await dialog.getByRole('button', { name: 'Carregar mais', exact: true }).click(); await page.waitForFunction(() => document.querySelectorAll('[data-client-id]').length === 25);
+    await dialog.getByLabel('Buscar devedora por nome').fill('Jéssica'); await page.waitForFunction(() => document.querySelectorAll('[data-client-id]').length === 2 && !document.querySelector('[aria-label="Lista de devedores"]')?.getAttribute('aria-busy')?.includes('true'));
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.screenshot({ path: '.vercel/summary-debtors-mobile.png' });
+    await page.locator(`[data-client-id="${second}"]`).click(); await dialog.waitFor({ state: 'hidden' });
+    assert.equal(await page.getByLabel('Operações da cliente').locator('h2').innerText(), 'Jessica');
+    await page.getByRole('button', { name: 'Recebimento', exact: true }).click();
+    const say = async (text: string) => { await page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled')); await page.getByLabel('Mensagem', { exact: true }).fill(text); await page.getByRole('button', { name: 'Enviar mensagem', exact: true }).click(); await page.waitForFunction(() => !document.querySelector('.chat-composer input')?.hasAttribute('disabled')); };
+    await say('0,12'); assert.equal((await pool.query('SELECT count(*)::int AS n FROM pagamentos WHERE client_id=$1', [second])).rows[0].n, 0);
+    await page.getByRole('button', { name: /Total a receber/ }).click(); await dialog.waitFor(); await page.waitForFunction(() => document.querySelectorAll('[data-client-id]').length === 20);
+    assert.equal(await page.locator('[data-client-id]').first().isDisabled(), true); await dialog.getByRole('button', { name: 'Fechar', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: 'Registrar recebimento', exact: true }).click(); await expectTotal('received', '10,87'); await expectTotal('pending', '340,34');
+    assert.equal((await pool.query('SELECT count(*)::int AS n FROM pagamentos WHERE client_id=$1', [second])).rows[0].n, 1);
+    await say('Outra operação com esta cliente'); await page.getByRole('button', { name: 'Nova venda', exact: true }).click(); await say('perfume 5 reais, ela pagou 1 real');
+    await page.getByRole('button', { name: 'Confirmar venda', exact: true }).click(); await expectTotal('sales', '105,25'); await expectTotal('received', '11,87'); await expectTotal('pending', '344,34');
+    await page.getByRole('button', { name: /Total a receber/ }).click(); await dialog.getByRole('button', { name: 'Fechar', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+    assert.deepEqual(errors, []); console.log('PASS financial mobile: exact monthly/history totals, positive balances, bounded pages/search, duplicate-name ID selection, modal open/close and live sale/payment updates');
   } else {
   browser = await chromium.launch({ headless: true, channel: 'msedge' });
   const context = await browser.newContext({ viewport: { width: 393, height: 852 }, acceptDownloads: true });
