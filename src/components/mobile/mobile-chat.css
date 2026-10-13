@@ -31,8 +31,19 @@
 
 /* One floral canvas behind the official mobile conversation, including landscape.
    Only the feed scrolls; the original image stays on its full-height parent. */
-.chat-official{padding:0;background:#fff3eb}
-.chat-official .chat-phone{max-width:none;border-radius:0;box-shadow:none}
+.caderninho-mobile,.caderninho-mobile body{height:100%;width:100%;overflow:hidden;overscroll-behavior:none;background:#fff3eb}
+.caderninho-mobile body{position:fixed;inset:0;margin:0;padding:0;isolation:isolate}
+.caderninho-mobile body::before{content:'';position:fixed;top:0;left:0;right:0;height:100vh;height:100lvh;min-height:100%;background:#fff3eb url('../../assets/fundo.png') center/cover no-repeat;pointer-events:none;z-index:-1}
+.caderninho-mobile #root{height:100%;min-height:0;overflow:hidden}
+.chat-official{inset:auto 0 auto 0;top:0;height:100vh;height:100dvh;padding:0;background:transparent;overflow:hidden;overscroll-behavior:none}
+.chat-official .chat-phone{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;max-width:none;border-radius:0;box-shadow:none;background:transparent;overflow:hidden}
+.chat-top{min-width:0}
+.chat-official .chat-feed{min-width:0;overflow-x:hidden;overflow-anchor:none;overscroll-behavior-y:none;-webkit-overflow-scrolling:touch}
 .chat-official .chat-header,.chat-official .chat-demo-label,.chat-official .chat-footer{background:transparent;border:0}
 .chat-official .chat-footer-note{display:block}
 @media(max-height:550px){.chat-official .chat-footer-note{margin-top:4px}}
+.chat-compact .chat-header{padding-top:calc(7px + env(safe-area-inset-top));padding-bottom:7px}
+.chat-compact .chat-avatar{width:36px;height:36px}.chat-compact .chat-heading h1{font-size:23px}
+.chat-compact .chat-demo-label{padding-top:2px;padding-bottom:2px}.chat-compact .chat-footer{padding-top:6px}
+.chat-compact .mobile-financial-card{padding-top:5px;padding-bottom:5px}.chat-compact .mobile-financial-card>span{min-height:0}
+.chat-compact .chat-footer-note{display:none}.chat-keyboard-open .chat-footer{padding-bottom:8px}
